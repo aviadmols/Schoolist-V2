@@ -142,7 +142,8 @@ class ClassroomResource extends Resource
                                         TextInput::make('url')
                                             ->label('URL')
                                             ->url()
-                                            ->requiredWithout('file_path'),
+                                            ->requiredWithout('file_path')
+                                            ->nullable(),
                                         FileUpload::make('file_path')
                                             ->label('File')
                                             ->disk('public')

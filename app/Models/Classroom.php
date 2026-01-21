@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
 
 class Classroom extends Model
 {
@@ -16,6 +17,14 @@ class Classroom extends Model
         static::creating(function (Classroom $classroom) {
             if (!$classroom->join_code) {
                 $classroom->join_code = static::generateUniqueJoinCode();
+            }
+        });
+
+        static::updating(function (Classroom $classroom) {
+            if ($classroom->isDirty('timetable_image_path')) {
+                $oldPath = $classroom->getOriginal('timetable_image_path');
+                $newPath = $classroom->timetable_image_path;
+                static::updateMediaSizeForFileChange($classroom->id, $oldPath, $newPath);
             }
         });
     }
@@ -30,6 +39,46 @@ class Classroom extends Model
         } while (static::where('join_code', $code)->exists());
 
         return $code;
+    }
+
+    /**
+     * Update classroom media size when a file path changes.
+     *
+     * @param int $classroomId
+     * @param string|null $oldPath
+     * @param string|null $newPath
+     * @return void
+     */
+    protected static function updateMediaSizeForFileChange(int $classroomId, ?string $oldPath, ?string $newPath): void
+    {
+        $oldSize = static::getMediaFileSize($oldPath);
+        $newSize = static::getMediaFileSize($newPath);
+        $delta = $newSize - $oldSize;
+
+        if ($delta > 0) {
+            static::where('id', $classroomId)->increment('media_size_bytes', $delta);
+        } elseif ($delta < 0) {
+            static::where('id', $classroomId)->decrement('media_size_bytes', abs($delta));
+        }
+    }
+
+    /**
+     * Get file size from the public disk.
+     *
+     * @param string|null $path
+     * @return int
+     */
+    protected static function getMediaFileSize(?string $path): int
+    {
+        if (!$path) {
+            return 0;
+        }
+
+        if (!Storage::disk('public')->exists($path)) {
+            return 0;
+        }
+
+        return (int) Storage::disk('public')->size($path);
     }
 
     /** @var array<int, string> */
