@@ -54,10 +54,6 @@ class ClassroomResource extends Resource
                                     ->schema([
                                         TextInput::make('join_code')->disabled()->dehydrated(false),
                                         TextInput::make('timezone')->required()->default('Asia/Jerusalem'),
-                                        Placeholder::make('classroom_url')
-                                            ->label('Classroom Dashboard')
-                                            ->content(fn (?Classroom $record) => $record ? new HtmlString("<a href='" . route('classroom.show', $record) . "' target='_blank' class='text-primary-600 underline font-bold'>כניסה לדשבורד הכיתה ↗</a>") : null)
-                                            ->visible(fn (?Classroom $record) => $record !== null),
                                         Placeholder::make('folder_path')
                                             ->label('Storage Path')
                                             ->content(fn (?Classroom $record) => $record ? "public/classrooms/{$record->id}/" : 'N/A')
