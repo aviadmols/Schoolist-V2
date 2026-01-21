@@ -35,6 +35,12 @@ Route::prefix('auth')->group(function () {
         ->name('auth.register');
 });
 
+Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
+    return \Inertia\Inertia::render('Dashboard', [
+        'classroom' => $classroom
+    ]);
+})->name('classroom.show');
+
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', \App\Http\Controllers\Classroom\DashboardController::class)
         ->middleware('classroom.context')

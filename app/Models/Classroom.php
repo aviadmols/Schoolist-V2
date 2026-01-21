@@ -39,6 +39,9 @@ class Classroom extends Model
         'timezone',
         'media_size_bytes',
         'timetable_file_id',
+        'city',
+        'school_name',
+        'grade_level',
     ];
 
     /**

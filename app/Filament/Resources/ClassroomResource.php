@@ -26,24 +26,55 @@ class ClassroomResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\TextInput::make('name')
-                    ->required()
-                    ->maxLength(255),
-                Forms\Components\TextInput::make('join_code')
-                    ->maxLength(10)
-                    ->disabled() // Join code is auto-generated
-                    ->dehydrated(false),
-                Forms\Components\TextInput::make('timezone')
-                    ->required()
-                    ->default('Asia/Jerusalem'),
-                Forms\Components\Placeholder::make('media_size_bytes')
-                    ->label('Media Size')
-                    ->content(fn (?Classroom $record): string => $record ? number_format($record->media_size_bytes / 1024 / 1024, 2) . ' MB' : '0.00 MB')
-                    ->visible(fn (?Classroom $record): bool => $record !== null),
-                Forms\Components\Placeholder::make('folder_path')
-                    ->label('Storage Path')
-                    ->content(fn (?Classroom $record): string => $record ? "public/classrooms/{$record->id}/" : 'N/A')
-                    ->visible(fn (?Classroom $record): bool => $record !== null),
+                Forms\Components\Section::make('Basic Information')
+                    ->schema([
+                        Forms\Components\TextInput::make('name')
+                            ->required()
+                            ->maxLength(255),
+                        Forms\Components\TextInput::make('city')
+                            ->label('City')
+                            ->maxLength(255),
+                        Forms\Components\TextInput::make('school_name')
+                            ->label('School Name')
+                            ->maxLength(255),
+                        Forms\Components\Select::make('grade_level')
+                            ->label('Grade Level')
+                            ->options([
+                                'א' => "כיתה א'",
+                                'ב' => "כיתה ב'",
+                                'ג' => "כיתה ג'",
+                                'ד' => "כיתה ד'",
+                                'ה' => "כיתה ה'",
+                                'ו' => "כיתה ו'",
+                                'ז' => "כיתה ז'",
+                                'ח' => "כיתה ח'",
+                                'ט' => "כיתה ט'",
+                                'י' => "כיתה י'",
+                                'יא' => "כיתה י\"א",
+                                'יב' => "כיתה י\"ב",
+                                'other' => 'אחר',
+                            ])
+                            ->searchable(),
+                    ])->columns(2),
+
+                Forms\Components\Section::make('System Details')
+                    ->schema([
+                        Forms\Components\TextInput::make('join_code')
+                            ->maxLength(10)
+                            ->disabled()
+                            ->dehydrated(false),
+                        Forms\Components\TextInput::make('timezone')
+                            ->required()
+                            ->default('Asia/Jerusalem'),
+                        Forms\Components\Placeholder::make('media_size_bytes')
+                            ->label('Media Size')
+                            ->content(fn (?Classroom $record): string => $record ? number_format($record->media_size_bytes / 1024 / 1024, 2) . ' MB' : '0.00 MB')
+                            ->visible(fn (?Classroom $record): bool => $record !== null),
+                        Forms\Components\Placeholder::make('folder_path')
+                            ->label('Storage Path')
+                            ->content(fn (?Classroom $record): string => $record ? "public/classrooms/{$record->id}/" : 'N/A')
+                            ->visible(fn (?Classroom $record): bool => $record !== null),
+                    ])->columns(2),
             ]);
     }
 
