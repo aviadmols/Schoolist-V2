@@ -1,9 +1,9 @@
 <x-filament::page>
-    <x-filament::form wire:submit.prevent="createCode">
+    <form wire:submit.prevent="createCode" class="space-y-4">
         {{ $this->form }}
 
-        <x-filament::button type="submit">
+        <button type="submit" class="filament-button filament-button-size-md filament-button-color-primary">
             Create Code
-        </x-filament::button>
-    </x-filament::form>
+        </button>
+    </form>
 </x-filament::page>
