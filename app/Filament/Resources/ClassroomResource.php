@@ -70,7 +70,7 @@ class ClassroomResource extends Resource
                                         FileUpload::make('timetable_file_id')
                                             ->label('Upload Timetable Image')
                                             ->image()
-                                            ->disk('public') // Explicitly use public disk
+                                            ->disk('public')
                                             ->directory(fn (?Classroom $record) => $record ? "classrooms/{$record->id}/timetable" : "temp")
                                             ->visibility('public'),
                                         CheckboxList::make('active_days')
@@ -83,12 +83,12 @@ class ClassroomResource extends Resource
                                     ]),
 
                                 ...static::getDayRepeaterSchema(0, 'Sunday (יום א\')', 'sundayEntries'),
-                                ...static::getDayRepeaterSchema(1, 'Monday (יום b\')', 'mondayEntries'),
-                                ...static::getDayRepeaterSchema(2, 'Tuesday (יום c\')', 'tuesdayEntries'),
-                                ...static::getDayRepeaterSchema(3, 'Wednesday (יום d\')', 'wednesdayEntries'),
-                                ...static::getDayRepeaterSchema(4, 'Thursday (יום e\')', 'thursdayEntries'),
-                                ...static::getDayRepeaterSchema(5, 'Friday (יום f\')', 'fridayEntries'),
-                                ...static::getDayRepeaterSchema(6, 'Saturday (יום g\')', 'saturdayEntries'),
+                                ...static::getDayRepeaterSchema(1, 'Monday (יום ב\')', 'mondayEntries'),
+                                ...static::getDayRepeaterSchema(2, 'Tuesday (יום ג\')', 'tuesdayEntries'),
+                                ...static::getDayRepeaterSchema(3, 'Wednesday (יום ד\')', 'wednesdayEntries'),
+                                ...static::getDayRepeaterSchema(4, 'Thursday (יום ה\')', 'thursdayEntries'),
+                                ...static::getDayRepeaterSchema(5, 'Friday (יום ו\')', 'fridayEntries'),
+                                ...static::getDayRepeaterSchema(6, 'Saturday (יום ש\')', 'saturdayEntries'),
                             ]),
                     ])->columnSpanFull()
             ])->columns(1);
