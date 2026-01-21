@@ -1,2 +1,2 @@
-web: mkdir -p storage/app/public storage/app/livewire-tmp storage/framework/cache storage/framework/cache/data storage/framework/sessions storage/framework/views && chmod -R 775 storage bootstrap/cache && php artisan migrate --force && php artisan filament:assets && php artisan storage:link && php artisan serve --host=0.0.0.0 --port=$PORT
+web: mkdir -p /app/storage/framework/cache/data /app/storage/framework/sessions /app/storage/framework/views /app/storage/app/public /app/storage/app/livewire-tmp && chmod -R 777 /app/storage /app/bootstrap/cache && php artisan optimize:clear && php artisan migrate --force && php artisan filament:assets && php artisan storage:link && php artisan serve --host=0.0.0.0 --port=$PORT
 worker: php artisan queue:work
