@@ -6,6 +6,8 @@
     </div>
 
     <form class="stack" @submit.prevent="submitLoginForm">
+      <div v-if="error" class="text-danger text-sm">{{ error }}</div>
+
       <UiField label="Email">
         <UiInput v-model="email" type="email" placeholder="name@example.com" />
       </UiField>
@@ -25,6 +27,7 @@
 
 <script setup>
 import { ref } from 'vue';
+import { router } from '@inertiajs/vue3';
 import AuthLayout from '../../layouts/AuthLayout.vue';
 import UiButton from '../../components/ui/UiButton.vue';
 import UiCheckbox from '../../components/ui/UiCheckbox.vue';
@@ -36,31 +39,33 @@ import UiInput from '../../components/ui/UiInput.vue';
  */
 defineOptions({ layout: AuthLayout });
 
-const SUBMIT_SIMULATION_DELAY_MS = 250;
-
 const email = ref('');
 const password = ref('');
 const remember = ref(false);
 const isSubmitting = ref(false);
+const error = ref(null);
 
 /**
- * Reset the submitting state.
- *
- * @returns {void}
- */
-function resetSubmittingState() {
-  isSubmitting.value = false;
-}
-
-/**
- * Submit the login form (placeholder).
+ * Submit the login form.
  *
  * @returns {void}
  */
 function submitLoginForm() {
   isSubmitting.value = true;
+  error.value = null;
 
-  window.setTimeout(resetSubmittingState, SUBMIT_SIMULATION_DELAY_MS);
+  router.post('/login', {
+    email: email.value,
+    password: password.value,
+    remember: remember.value,
+  }, {
+    onFinish: () => {
+      isSubmitting.value = false;
+    },
+    onError: (errors) => {
+      error.value = errors.email || 'Login failed. Please check your credentials.';
+    }
+  });
 }
 </script>
 

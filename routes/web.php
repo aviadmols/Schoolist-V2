@@ -7,6 +7,7 @@ use App\Http\Controllers\Public\GetLandingPageController;
 Route::get('/', GetLandingPageController::class)->name('landing');
 
 Route::get('/login', GetLoginPageController::class)->name('login');
+Route::post('/login', \App\Http\Controllers\Auth\LoginController::class);
 
 Route::prefix('auth')->group(function () {
     Route::post('/otp/request', \App\Http\Controllers\Auth\RequestOtpController::class)
