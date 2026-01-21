@@ -95,7 +95,7 @@ class ClassroomResource extends Resource
                                         TextInput::make('last_name')->label('Last Name')->required(),
                                         TextInput::make('role')->label('Role')->required(),
                                         TextInput::make('phone')->label('Phone')->tel()
-                                            ->helperText(fn ($state) => $state && !preg_match('/^05\d{8}$/', $state) ? new HtmlString('<span class="text-warning-600 text-xs">Note: Standard format is 0503222012</span>') : null),
+                                            ->helperText(fn ($state) => $state && !preg_match('/^05\d{8}$/', $state) ? new HtmlString('<span class="text-warning-600 text-xs">Note: Standard format is 050-0000000</span>') : null),
                                         TextInput::make('email')->label('Email')->email(),
                                     ])->columns(2)->addActionLabel('Add New Contact'),
                             ]),

@@ -33,7 +33,7 @@ class ImportantContactsRelationManager extends RelationManager
                     ->label('Phone')
                     ->tel()
                     ->live(onBlur: true)
-                    ->helperText(fn ($state) => $state && !preg_match('/^05\d{8}$/', $state) ? new HtmlString('<span class="text-warning-600 text-xs">Note: This does not look like a standard Israeli mobile number (e.g. 0503222012)</span>') : null),
+                    ->helperText(fn ($state) => $state && !preg_match('/^05\d{8}$/', $state) ? new HtmlString('<span class="text-warning-600 text-xs">Note: Standard format is 050-0000000</span>') : null),
                 Forms\Components\TextInput::make('email')
                     ->label('Email')
                     ->email()
