@@ -1,0 +1,24 @@
+:root {
+  --font-sans: "Polin", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    Arial, "Noto Sans", "Liberation Sans", sans-serif;
+
+  --color-text: #000;
+  --color-muted: #666;
+  --color-primary: #06F;
+  --color-border: rgba(0, 0, 0, 0.15);
+  --color-card: #F5F6F8;
+  --color-white: #ffffff;
+
+  --radius-6: 6px;
+  --radius-10: 10px;
+
+  --space-1: 6px;
+  --space-2: 10px;
+  --space-3: 14px;
+  --space-4: 18px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --container-max-width: 980px;
+}
+

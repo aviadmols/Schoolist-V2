@@ -1,0 +1,13 @@
+@import "./tokens.css";
+@import "./ui.css";
+
+.page-auth {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+}
+
+.page-auth__inner {
+  width: 100%;
+}
+

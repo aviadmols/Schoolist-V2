@@ -1,0 +1,39 @@
+GLOBAL RULES
+- English-only code (no Hebrew in code or comments).
+- Add short PHPDoc/JSDoc before every function/method.
+- Prefer minimal readable code over verbose code.
+- Descriptive function names only.
+- Constants at the top (no magic numbers).
+- Plain CSS only (no Tailwind, no SCSS).
+- Use a strict UI kit with reusable Vue components; no duplicated markup.
+- Animations only for modals using Vue <Transition> + CSS (subtle).
+- Multi-tenancy: every tenant table has classroom_id, all queries are scoped.
+- Roles: users.role = site_admin|user; classroom_user.role = owner|admin|member.
+- Storage: local server storage under storage/app/public/classrooms/{classroom_id}/...
+- Implement structured JSON logs + audit_logs table + RequestId.
+- Use queues for SMS sending (019) and never log secrets/OTP codes.
+- Follow the project structure:
+  app/Services/* split by domains (Auth, Classroom, Announcements, Storage, Sms, Audit).
+  resources/js/components/ui/* reusable components.
+  resources/css/tokens.css ui.css app.css.
+
+
+UI CONSISTENCY (MANDATORY)
+- All buttons must use UiButton (no <button> markup in pages).
+- All forms must use UiField + UiInput/UiSelect/UiTextarea (no page-specific field markup).
+- All modals must use UiModal (no custom modal markup in pages).
+- No page-level CSS for shared UI elements. Shared styles must live only in resources/css/ui.css.
+- Only allow page-level CSS for layout spacing that cannot be expressed via existing UI kit classes.
+
+NO DUPLICATION (MANDATORY)
+- If the same HTML pattern appears twice, extract it into a reusable UI component.
+- If the same CSS rule appears twice, move it into the UI kit.
+
+SIMPLICITY (MANDATORY)
+- Keep functions small and single-purpose.
+- Avoid abstractions unless reused at least twice.
+- Prefer clear code over clever code. No overly complex generic factories.
+
+NAMING (MANDATORY)
+- Use explicit function names: create*, update*, delete*, get*, list*, compute*, toggle*, purge*.
+- Do not use vague names like handle(), process(), doWork(), execute() unless scoped and specific.

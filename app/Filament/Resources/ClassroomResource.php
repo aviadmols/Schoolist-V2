@@ -1,0 +1,108 @@
+<?php
+
+namespace App\Filament\Resources;
+
+use App\Filament\Resources\ClassroomResource\Pages;
+use App\Models\Classroom;
+use App\Services\Storage\FileStorageService;
+use Filament\Forms;
+use Filament\Forms\Form;
+use Filament\Resources\Resource;
+use Filament\Tables;
+use Filament\Tables\Table;
+use Filament\Notifications\Notification;
+
+class ClassroomResource extends Resource
+{
+    protected static ?string $model = Classroom::class;
+
+    protected static ?string $navigationIcon = 'heroicon-o-academic-cap';
+
+    /**
+     * Define the form for creating/editing classrooms.
+     */
+    public static function form(Form $form): Form
+    {
+        return $form
+            ->schema([
+                Forms\Components\TextInput::make('name')
+                    ->required()
+                    ->maxLength(255),
+                Forms\Components\TextInput::make('join_code')
+                    ->maxLength(10)
+                    ->disabled() // Join code is auto-generated
+                    ->dehydrated(false),
+                Forms\Components\TextInput::make('timezone')
+                    ->required()
+                    ->default('Asia/Jerusalem'),
+                Forms\Components\Placeholder::make('media_size_bytes')
+                    ->label('Media Size')
+                    ->content(fn (Classroom $record): string => number_format($record->media_size_bytes / 1024 / 1024, 2) . ' MB'),
+                Forms\Components\Placeholder::make('folder_path')
+                    ->label('Storage Path')
+                    ->content(fn (Classroom $record): string => "public/classrooms/{$record->id}/"),
+            ]);
+    }
+
+    /**
+     * Define the table for listing classrooms.
+     */
+    public static function table(Table $table): Table
+    {
+        return $table
+            ->columns([
+                Tables\Columns\TextColumn::make('name')->searchable(),
+                Tables\Columns\TextColumn::make('join_code'),
+                Tables\Columns\TextColumn::make('media_size_bytes')
+                    ->label('Media Size')
+                    ->formatStateUsing(fn (int $state): string => number_format($state / 1024 / 1024, 2) . ' MB'),
+                Tables\Columns\TextColumn::make('users_count')
+                    ->counts('users')
+                    ->label('Members'),
+            ])
+            ->filters([
+                //
+            ])
+            ->actions([
+                Tables\Actions\EditAction::make(),
+                Tables\Actions\Action::make('purge_media')
+                    ->label('Purge Media')
+                    ->icon('heroicon-o-trash')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->action(function (Classroom $record, FileStorageService $storageService) {
+                        $storageService->purgeClassroomFolder($record->id);
+                        
+                        Notification::make()
+                            ->title('Media purged successfully')
+                            ->success()
+                            ->send();
+                    }),
+            ])
+            ->bulkActions([
+                Tables\Actions\DeleteBulkAction::make(),
+            ]);
+    }
+
+    /**
+     * Define the relation managers for this resource.
+     */
+    public static function getRelations(): array
+    {
+        return [
+            RelationManagers\UsersRelationManager::class,
+        ];
+    }
+
+    /**
+     * Define the pages for this resource.
+     */
+    public static function getPages(): array
+    {
+        return [
+            'index' => Pages\ListClassrooms::route('/'),
+            'create' => Pages\CreateClassroom::route('/create'),
+            'edit' => Pages\EditClassroom::route('/{record}/edit'),
+        ];
+    }
+}
