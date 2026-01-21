@@ -138,7 +138,19 @@ class ClassroomResource extends Resource
                                     ->relationship()
                                     ->schema([
                                         TextInput::make('title')->label('Title')->required(),
-                                        TextInput::make('url')->label('URL')->url()->required(),
+                                        TextInput::make('url')
+                                            ->label('URL')
+                                            ->url()
+                                            ->requiredWithout('file_path'),
+                                        FileUpload::make('file_path')
+                                            ->label('File')
+                                            ->disk('public')
+                                            ->directory(function (Forms\Get $get): string {
+                                                $classroomId = $get('../../id');
+                                                return $classroomId ? "classrooms/{$classroomId}/links" : 'temp';
+                                            })
+                                            ->visibility('public')
+                                            ->requiredWithout('url'),
                                         TextInput::make('category')->label('Category')->placeholder('e.g. Homework'),
                                     ])->columns(3)->addActionLabel('Add New Link')
                                     ->defaultItems(0), // Fixed: Start empty

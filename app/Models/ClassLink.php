@@ -12,6 +12,7 @@ class ClassLink extends Model
         'classroom_id',
         'title',
         'url',
+        'file_path',
         'icon',
         'sort_order',
     ];
