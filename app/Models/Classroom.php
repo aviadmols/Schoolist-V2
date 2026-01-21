@@ -8,6 +8,30 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Classroom extends Model
 {
+    /**
+     * Boot the model.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (Classroom $classroom) {
+            if (!$classroom->join_code) {
+                $classroom->join_code = static::generateUniqueJoinCode();
+            }
+        });
+    }
+
+    /**
+     * Generate a unique 10-digit join code.
+     */
+    protected static function generateUniqueJoinCode(): string
+    {
+        do {
+            $code = (string) rand(1000000000, 9999999999);
+        } while (static::where('join_code', $code)->exists());
+
+        return $code;
+    }
+
     /** @var array<int, string> */
     protected $fillable = [
         'name',
