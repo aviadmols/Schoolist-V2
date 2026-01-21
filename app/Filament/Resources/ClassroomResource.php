@@ -125,11 +125,32 @@ class ClassroomResource extends Resource
                                 Repeater::make('children')
                                     ->relationship()
                                     ->schema([
-                                        TextInput::make('first_name')->required(),
-                                        TextInput::make('last_name')->required(),
-                                        DatePicker::make('birthday')->label('Birthday'),
-                                        Textarea::make('notes')->label('Medical/Other Notes')->rows(2),
-                                    ])->columns(2)->addActionLabel('Add New Child')
+                                        TextInput::make('name')
+                                            ->label('Child Name')
+                                            ->required(),
+                                        Repeater::make('contacts')
+                                            ->relationship()
+                                            ->schema([
+                                                TextInput::make('name')
+                                                    ->label('Contact Name')
+                                                    ->required(),
+                                                Select::make('relation')
+                                                    ->label('Relation')
+                                                    ->options([
+                                                        'father' => 'Father',
+                                                        'mother' => 'Mother',
+                                                        'other' => 'Other',
+                                                    ])
+                                                    ->required(),
+                                                TextInput::make('phone')
+                                                    ->label('Phone')
+                                                    ->tel()
+                                                    ->helperText(fn ($state) => $state && !preg_match('/^05\d{8}$/', $state) ? new HtmlString('<span class="text-warning-600 text-xs">Note: Standard format is 050-0000000</span>') : null),
+                                            ])
+                                            ->columns(3)
+                                            ->addActionLabel('Add Contact')
+                                            ->defaultItems(0),
+                                    ])->columns(1)->addActionLabel('Add New Child')
                                     ->defaultItems(0), // Fixed: Start empty
                             ]),
 
