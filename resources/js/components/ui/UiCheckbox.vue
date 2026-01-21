@@ -5,9 +5,9 @@
       type="checkbox"
       :checked="modelValue"
       :disabled="disabled"
-      @change="onChange"
+      @change="onToggle"
     />
-    <span>
+    <span v-if="$slots.default">
       <slot />
     </span>
   </label>
@@ -25,11 +25,9 @@ const props = defineProps({
  * Emit v-model updates for the checkbox.
  *
  * @param {Event} event
- * @returns {void}
  */
-function onChange(event) {
+function onToggle(event) {
   const target = event.target;
   emit('update:modelValue', Boolean(target && target.checked));
 }
 </script>
-

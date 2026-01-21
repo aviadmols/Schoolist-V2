@@ -2,10 +2,10 @@
   <div class="stack">
     <div class="flex items-center justify-between">
       <h1 class="text-title">Announcements</h1>
-      <UiButton @click="showCreateModal = true" variant="primary">Add New</UiButton>
+      <UiButton @click="openModal" variant="primary">Add New</UiButton>
     </div>
 
-    <div v-if="announcements.length === 0" class="card card__body">
+    <div v-if="!announcements || announcements.length === 0" class="card card__body">
       <p class="text-muted text-center">No active announcements for now.</p>
     </div>
 
@@ -13,7 +13,7 @@
       <div v-for="item in announcements" :key="item.id" class="card">
         <div class="card__body flex items-start gap-4">
           <UiCheckbox 
-            :model-value="item.is_done" 
+            v-model="item.is_done"
             @update:model-value="toggleDone(item)" 
           />
           <div :class="{ 'done-item': item.is_done }">
@@ -46,7 +46,7 @@
         </UiField>
 
         <div class="flex gap-3 justify-end mt-4">
-          <UiButton @click="showCreateModal = false" variant="ghost" type="button">Cancel</UiButton>
+          <UiButton @click="closeModal" variant="ghost" type="button">Cancel</UiButton>
           <UiButton type="submit" variant="primary" :disabled="form.processing">Create</UiButton>
         </div>
       </form>
@@ -69,7 +69,10 @@ import UiSelect from '../components/ui/UiSelect.vue';
 defineOptions({ layout: AppLayout });
 
 const props = defineProps({
-  announcements: Array,
+  announcements: {
+    type: Array,
+    default: () => [],
+  },
 });
 
 const showCreateModal = ref(false);
@@ -88,14 +91,26 @@ const form = useForm({
 });
 
 /**
+ * Open create modal.
+ */
+function openModal() {
+  showCreateModal.value = true;
+}
+
+/**
+ * Close create modal.
+ */
+function closeModal() {
+  showCreateModal.value = false;
+}
+
+/**
  * Submit the new announcement form.
- *
- * @returns {void}
  */
 function submit() {
   form.post('/announcements', {
     onSuccess: () => {
-      showCreateModal.value = false;
+      closeModal();
       form.reset();
     },
   });
@@ -105,10 +120,11 @@ function submit() {
  * Toggle the done state of an announcement.
  *
  * @param {Object} item
- * @returns {void}
  */
 function toggleDone(item) {
-  router.post(`/announcements/${item.id}/done`);
+  router.post(`/announcements/${item.id}/done`, {}, {
+    preserveScroll: true,
+  });
 }
 </script>
 
