@@ -62,6 +62,10 @@ class ClassroomResource extends Resource
                                             ->label('Storage Path')
                                             ->content(fn (?Classroom $record) => $record ? "public/classrooms/{$record->id}/" : 'N/A')
                                             ->visible(fn (?Classroom $record) => $record !== null),
+                                        Placeholder::make('media_size_bytes')
+                                            ->label('Media Size')
+                                            ->content(fn (?Classroom $record): string => $record ? number_format($record->media_size_bytes / 1024 / 1024, 2) . ' MB' : '0.00 MB')
+                                            ->visible(fn (?Classroom $record): bool => $record !== null),
                                     ])->columns(2),
                             ]),
 
