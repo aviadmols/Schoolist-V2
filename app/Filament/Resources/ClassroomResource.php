@@ -150,20 +150,19 @@ class ClassroomResource extends Resource
             Section::make($label)
                 ->collapsible()
                 ->collapsed()
-                // Lenient check for string vs integer keys
                 ->hidden(fn (Forms\Get $get) => !in_array((string)$dayId, array_map('strval', $get('active_days') ?? [])))
                 ->schema([
                     Repeater::make($relationship)
                         ->relationship()
                         ->schema([
-                            TextInput::make('subject')->label('Lesson')->required(),
-                            TextInput::make('teacher')->label('Teacher'),
-                            TextInput::make('special_message')->label('Note'),
+                            TextInput::make('subject')->label('Lesson Name')->required(),
+                            TextInput::make('teacher')->label('Teacher (Optional)'),
+                            TextInput::make('special_message')->label('Special Message'),
                             Forms\Components\Hidden::make('day_of_week')->default($dayId),
                         ])
                         ->columns(3)
                         ->reorderable('sort_order')
-                        ->addActionLabel('Add Lesson')
+                        ->addActionLabel('Add Lesson for ' . $label)
                         ->defaultItems(1),
                 ]),
         ];
