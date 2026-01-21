@@ -30,7 +30,7 @@
         </h3>
         <button class="text-muted text-xs"><i class="icon-edit"></i></button>
       </div>
-      <TimetableCard :entries="timetable" />
+      <TimetableCard :entries="timetable[currentDay] || []" />
     </div>
 
     <!-- Weather/Info Box (Placeholder) -->
@@ -115,7 +115,7 @@ defineOptions({ layout: AppLayout });
 const props = defineProps({
   classroom: Object,
   selected_day: Number,
-  timetable: Array,
+  timetable: Object, // Changed from Array to Object (keyed by day index)
   announcements: Array,
   timetable_image: String,
 });
@@ -125,9 +125,9 @@ const showQuickAdd = ref(false);
 
 const dayNames = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
 
-watch(currentDay, (newDay) => {
-  router.get('/dashboard', { day: newDay }, { preserveState: true, preserveScroll: true });
-});
+// No longer need to watch and reload from server for day switching!
+// The whole week is now loaded in props.timetable.
+
 
 /**
  * Toggle announcement done state.

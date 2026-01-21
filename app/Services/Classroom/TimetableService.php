@@ -9,6 +9,35 @@ use Illuminate\Support\Collection;
 class TimetableService
 {
     /**
+     * Get the whole weekly timetable.
+     *
+     * @param Classroom $classroom
+     * @return array
+     */
+    public function getWeeklyTimetable(Classroom $classroom): array
+    {
+        $entries = TimetableEntry::where('classroom_id', $classroom->id)
+            ->orderBy('start_time')
+            ->get()
+            ->groupBy('day_of_week');
+
+        $timetable = [];
+        for ($i = 0; $i <= 6; $i++) {
+            $timetable[$i] = ($entries->get($i) ?? collect())->map(function (TimetableEntry $entry) {
+                return [
+                    'id' => $entry->id,
+                    'start_time' => substr($entry->start_time, 0, 5),
+                    'end_time' => substr($entry->end_time, 0, 5),
+                    'subject' => $entry->subject,
+                    'teacher' => $entry->teacher,
+                ];
+            })->values()->toArray();
+        }
+
+        return $timetable;
+    }
+
+    /**
      * Get timetable entries for a specific day.
      *
      * @param Classroom $classroom

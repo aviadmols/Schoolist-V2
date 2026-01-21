@@ -42,7 +42,7 @@ class DashboardController extends Controller
                 'school_name' => $classroom->school?->name,
             ],
             'selected_day' => (int) $dayOfWeek,
-            'timetable' => $this->timetableService->getEntriesForDay($classroom, (int) $dayOfWeek),
+            'timetable' => $this->timetableService->getWeeklyTimetable($classroom), // Get whole week
             'announcements' => $this->announcementService->getActiveFeed($classroom),
             'timetable_image' => $this->timetableService->getTimetableImageUrl($classroom),
         ]);

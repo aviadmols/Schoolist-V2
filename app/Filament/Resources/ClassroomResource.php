@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ClassroomResource\Pages;
+use App\Filament\Resources\ClassroomResource\RelationManagers;
 use App\Models\Classroom;
 use App\Models\School;
 use Filament\Forms;
@@ -19,9 +20,7 @@ use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\Textarea;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
 
 class ClassroomResource extends Resource
@@ -66,14 +65,17 @@ class ClassroomResource extends Resource
                         Tabs\Tab::make('Timetable')
                             ->icon('heroicon-o-calendar')
                             ->schema([
-                                FileUpload::make('timetable_file_id')->label('Upload Timetable Image')->image()->directory('classrooms/timetables'),
-                                CheckboxList::make('active_days')
-                                    ->label('Select Active Days')
-                                    ->options([
-                                        0 => 'Sunday (א)', 1 => 'Monday (ב)', 2 => 'Tuesday (ג)', 
-                                        3 => 'Wednesday (ד)', 4 => 'Thursday (ה)', 5 => 'Friday (ו)', 6 => 'Saturday (ש)',
-                                    ])
-                                    ->columns(7)->live(),
+                                Section::make('Configuration')
+                                    ->schema([
+                                        FileUpload::make('timetable_file_id')->label('Upload Timetable Image')->image()->directory('classrooms/timetables'),
+                                        CheckboxList::make('active_days')
+                                            ->label('Select Active Days')
+                                            ->options([
+                                                0 => 'Sunday (א)', 1 => 'Monday (ב)', 2 => 'Tuesday (ג)', 
+                                                3 => 'Wednesday (ד)', 4 => 'Thursday (ה)', 5 => 'Friday (ו)', 6 => 'Saturday (ש)',
+                                            ])
+                                            ->columns(7)->live(),
+                                    ]),
 
                                 ...static::getDayRepeaterSchema(0, 'Sunday (יום א\')', 'sundayEntries'),
                                 ...static::getDayRepeaterSchema(1, 'Monday (יום ב\')', 'mondayEntries'),
@@ -82,63 +84,6 @@ class ClassroomResource extends Resource
                                 ...static::getDayRepeaterSchema(4, 'Thursday (יום ה\')', 'thursdayEntries'),
                                 ...static::getDayRepeaterSchema(5, 'Friday (יום ו\')', 'fridayEntries'),
                                 ...static::getDayRepeaterSchema(6, 'Saturday (יום ש\')', 'saturdayEntries'),
-                            ]),
-
-                        // --- TAB: CONTACTS ---
-                        Tabs\Tab::make('Contacts')
-                            ->icon('heroicon-o-phone')
-                            ->schema([
-                                Repeater::make('importantContacts')
-                                    ->relationship()
-                                    ->schema([
-                                        TextInput::make('first_name')->label('First Name')->required(),
-                                        TextInput::make('last_name')->label('Last Name')->required(),
-                                        TextInput::make('role')->label('Role')->required(),
-                                        TextInput::make('phone')->label('Phone')->tel()
-                                            ->helperText(fn ($state) => $state && !preg_match('/^05\d{8}$/', $state) ? new HtmlString('<span class="text-warning-600 text-xs">Note: Standard format is 050-0000000</span>') : null),
-                                        TextInput::make('email')->label('Email')->email(),
-                                    ])->columns(2)->addActionLabel('Add New Contact'),
-                            ]),
-
-                        // --- TAB: CHILDREN ---
-                        Tabs\Tab::make('Children')
-                            ->icon('heroicon-o-user-group')
-                            ->schema([
-                                Repeater::make('children')
-                                    ->relationship()
-                                    ->schema([
-                                        TextInput::make('first_name')->required(),
-                                        TextInput::make('last_name')->required(),
-                                        DatePicker::make('birthday')->label('Birthday'),
-                                        Textarea::make('notes')->label('Medical/Other Notes')->rows(2),
-                                    ])->columns(2)->addActionLabel('Add New Child'),
-                            ]),
-
-                        // --- TAB: LINKS ---
-                        Tabs\Tab::make('Links & Materials')
-                            ->icon('heroicon-o-link')
-                            ->schema([
-                                Repeater::make('links')
-                                    ->relationship()
-                                    ->schema([
-                                        TextInput::make('title')->label('Title')->required(),
-                                        TextInput::make('url')->label('URL')->url()->required(),
-                                        TextInput::make('category')->label('Category')->placeholder('e.g. Homework'),
-                                    ])->columns(3)->addActionLabel('Add New Link'),
-                            ]),
-
-                        // --- TAB: HOLIDAYS ---
-                        Tabs\Tab::make('Holidays')
-                            ->icon('heroicon-o-sun')
-                            ->schema([
-                                Repeater::make('holidays')
-                                    ->relationship()
-                                    ->schema([
-                                        TextInput::make('name')->label('Holiday Name')->required(),
-                                        DatePicker::make('start_date')->label('Start Date')->required(),
-                                        DatePicker::make('end_date')->label('End Date')->required(),
-                                        Toggle::make('is_no_school')->label('No School Day')->default(true),
-                                    ])->columns(4)->addActionLabel('Add New Holiday'),
                             ]),
                     ])->columnSpanFull()
             ])->columns(1);
@@ -155,14 +100,14 @@ class ClassroomResource extends Resource
                     Repeater::make($relationship)
                         ->relationship()
                         ->schema([
-                            TextInput::make('subject')->label('Lesson Name')->required(),
-                            TextInput::make('teacher')->label('Teacher (Optional)'),
-                            TextInput::make('special_message')->label('Special Message'),
+                            TextInput::make('subject')->label('Lesson')->required(),
+                            TextInput::make('teacher')->label('Teacher'),
+                            TextInput::make('special_message')->label('Note'),
                             Forms\Components\Hidden::make('day_of_week')->default($dayId),
                         ])
                         ->columns(3)
                         ->reorderable('sort_order')
-                        ->addActionLabel('Add Lesson for ' . $label)
+                        ->addActionLabel('Add Lesson')
                         ->defaultItems(1),
                 ]),
         ];
@@ -181,6 +126,18 @@ class ClassroomResource extends Resource
             ->bulkActions([Tables\Actions\DeleteBulkAction::make()]);
     }
 
+    public static function getRelations(): array
+    {
+        return [
+            RelationManagers\UsersRelationManager::class,
+            RelationManagers\ImportantContactsRelationManager::class,
+            RelationManagers\ChildrenRelationManager::class,
+            RelationManagers\LinksRelationManager::class,
+            RelationManagers\HolidaysRelationManager::class,
+            RelationManagers\AnnouncementsRelationManager::class,
+        ];
+    }
+
     public static function getPages(): array
     {
         return [
@@ -188,5 +145,10 @@ class ClassroomResource extends Resource
             'create' => Pages\CreateClassroom::route('/create'),
             'edit' => Pages\EditClassroom::route('/{record}/edit'),
         ];
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->with(['city', 'school']);
     }
 }

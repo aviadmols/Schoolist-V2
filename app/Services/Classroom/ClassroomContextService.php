@@ -25,7 +25,7 @@ class ClassroomContextService
             return null;
         }
 
-        return Classroom::find($id);
+        return Classroom::with(['city', 'school'])->find($id);
     }
 
     /**
