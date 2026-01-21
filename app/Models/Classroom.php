@@ -43,6 +43,12 @@ class Classroom extends Model
         'school_id',
         'grade_level',
         'grade_number',
+        'active_days',
+    ];
+
+    /** @var array<string, string> */
+    protected $casts = [
+        'active_days' => 'array',
     ];
 
     /**
@@ -81,11 +87,43 @@ class Classroom extends Model
     }
 
     /**
-     * Structured timetable entries for this classroom.
+     * Timetable entries for this classroom.
      */
     public function timetableEntries(): HasMany
     {
-        return $this->hasMany(TimetableEntry::class);
+        return $this->hasMany(TimetableEntry::class)->orderBy('sort_order');
+    }
+
+    /**
+     * Holidays for this classroom.
+     */
+    public function holidays(): HasMany
+    {
+        return $this->hasMany(Holiday::class);
+    }
+
+    /**
+     * Important contacts for this classroom.
+     */
+    public function importantContacts(): HasMany
+    {
+        return $this->hasMany(ImportantContact::class);
+    }
+
+    /**
+     * Children in this classroom.
+     */
+    public function children(): HasMany
+    {
+        return $this->hasMany(Child::class);
+    }
+
+    /**
+     * Announcements/Updates for this classroom.
+     */
+    public function announcements(): HasMany
+    {
+        return $this->hasMany(Announcement::class);
     }
 
     /**

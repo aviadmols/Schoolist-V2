@@ -16,6 +16,8 @@ class TimetableEntry extends Model
         'subject',
         'teacher',
         'room',
+        'special_message',
+        'sort_order',
     ];
 
     /**

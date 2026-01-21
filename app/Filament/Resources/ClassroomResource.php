@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\ClassroomResource\Pages;
 use App\Filament\Resources\ClassroomResource\RelationManagers;
 use App\Models\Classroom;
+use App\Models\School;
 use App\Services\Storage\FileStorageService;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -12,6 +13,16 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Notifications\Notification;
+use Filament\Forms\Components\Tabs;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\Section;
+use Filament\Forms\Components\Grid;
+use Filament\Forms\Components\Placeholder;
+use Illuminate\Support\HtmlString;
 
 class ClassroomResource extends Resource
 {
@@ -26,73 +37,131 @@ class ClassroomResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Basic Information')
-                    ->schema([
-                        Forms\Components\TextInput::make('name')
-                            ->required()
-                            ->maxLength(255),
-                        Forms\Components\Select::make('city_id')
-                            ->label('City')
-                            ->relationship('city', 'name')
-                            ->searchable()
-                            ->preload()
-                            ->live(),
-                        Forms\Components\Select::make('school_id')
-                            ->label('School Name')
-                            ->options(fn (Forms\Get $get): \Illuminate\Support\Collection => \App\Models\School::where('city_id', $get('city_id'))->pluck('name', 'id'))
-                            ->searchable()
-                            ->preload()
-                            ->hidden(fn (Forms\Get $get): bool => ! $get('city_id')),
-                        Forms\Components\Grid::make(2)
+                Tabs::make('Classroom Details')
+                    ->tabs([
+                        // --- TAB: BASIC SETTINGS ---
+                        Tabs\Tab::make('General Settings')
+                            ->icon('heroicon-o-cog')
                             ->schema([
-                                Forms\Components\Select::make('grade_level')
-                                    ->label('Grade Letter')
-                                    ->options([
-                                        'א' => "א'",
-                                        'ב' => "ב'",
-                                        'ג' => "ג'",
-                                        'ד' => "ד'",
-                                        'ה' => "ה'",
-                                        'ו' => "ו'",
-                                        'ז' => "ז'",
-                                        'ח' => "ח'",
-                                        'ט' => "ט'",
-                                        'י' => "י'",
-                                        'יא' => "י\"א",
-                                        'יב' => "י\"ב",
-                                        'other' => 'אחר',
-                                    ])
-                                    ->required(),
-                                Forms\Components\Select::make('grade_number')
-                                    ->label('Grade Number')
-                                    ->options(array_combine(range(1, 20), range(1, 20)))
-                                    ->nullable(),
-                            ]),
-                    ])->columns(2),
+                                Section::make('Basic Information')
+                                    ->schema([
+                                        TextInput::make('name')
+                                            ->required()
+                                            ->maxLength(255),
+                                        Select::make('city_id')
+                                            ->label('City')
+                                            ->relationship('city', 'name')
+                                            ->searchable()
+                                            ->preload()
+                                            ->live(),
+                                        Select::make('school_id')
+                                            ->label('School Name')
+                                            ->options(fn (Forms\Get $get): \Illuminate\Support\Collection => School::where('city_id', $get('city_id'))->pluck('name', 'id'))
+                                            ->searchable()
+                                            ->preload()
+                                            ->hidden(fn (Forms\Get $get): bool => ! $get('city_id')),
+                                        Grid::make(2)
+                                            ->schema([
+                                                Select::make('grade_level')
+                                                    ->label('Grade Letter')
+                                                    ->options([
+                                                        'א' => "א'", 'ב' => "ב'", 'ג' => "ג'", 'ד' => "ד'", 'ה' => "ה'", 'ו' => "ו'",
+                                                        'ז' => "ז'", 'ח' => "ח'", 'ט' => "ט'", 'י' => "י'", 'יא' => "יא'", 'יב' => "יב'",
+                                                        'other' => 'אחר',
+                                                    ])
+                                                    ->required(),
+                                                Select::make('grade_number')
+                                                    ->label('Grade Number')
+                                                    ->options(array_combine(range(1, 20), range(1, 20)))
+                                                    ->nullable(),
+                                            ]),
+                                    ])->columns(2),
 
-                Forms\Components\Section::make('System Details')
-                    ->schema([
-                        Forms\Components\TextInput::make('join_code')
-                            ->maxLength(10)
-                            ->disabled()
-                            ->dehydrated(false),
-                        Forms\Components\TextInput::make('timezone')
-                            ->required()
-                            ->default('Asia/Jerusalem'),
-                        Forms\Components\Placeholder::make('media_size_bytes')
-                            ->label('Media Size')
-                            ->content(fn (?Classroom $record): string => $record ? number_format($record->media_size_bytes / 1024 / 1024, 2) . ' MB' : '0.00 MB')
-                            ->visible(fn (?Classroom $record): bool => $record !== null),
-                        Forms\Components\Placeholder::make('classroom_url')
-                            ->label('Classroom Link')
-                            ->content(fn (?Classroom $record): ?\Illuminate\Support\HtmlString => $record ? new \Illuminate\Support\HtmlString("<a href='" . route('classroom.show', $record) . "' target='_blank' class='text-primary-600 underline'>View Classroom Page</a>") : null)
-                            ->visible(fn (?Classroom $record): bool => $record !== null),
-                        Forms\Components\Placeholder::make('folder_path')
-                            ->label('Storage Path')
-                            ->content(fn (?Classroom $record): string => $record ? "public/classrooms/{$record->id}/" : 'N/A')
-                            ->visible(fn (?Classroom $record): bool => $record !== null),
-                    ])->columns(2),
-            ]);
+                                Section::make('System Details')
+                                    ->schema([
+                                        TextInput::make('join_code')
+                                            ->maxLength(10)
+                                            ->disabled()
+                                            ->dehydrated(false),
+                                        TextInput::make('timezone')
+                                            ->required()
+                                            ->default('Asia/Jerusalem'),
+                                        Placeholder::make('classroom_url')
+                                            ->label('Classroom Link')
+                                            ->content(fn (?Classroom $record): ?HtmlString => $record ? new HtmlString("<a href='" . route('classroom.show', $record) . "' target='_blank' class='text-primary-600 underline'>View Classroom Page</a>") : null)
+                                            ->visible(fn (?Classroom $record): bool => $record !== null),
+                                        Placeholder::make('media_size_bytes')
+                                            ->label('Media Size')
+                                            ->content(fn (?Classroom $record): string => $record ? number_format($record->media_size_bytes / 1024 / 1024, 2) . ' MB' : '0.00 MB')
+                                            ->visible(fn (?Classroom $record): bool => $record !== null),
+                                    ])->columns(2),
+                            ]),
+
+                        // --- TAB: TIMETABLE ---
+                        Tabs\Tab::make('Timetable')
+                            ->icon('heroicon-o-calendar')
+                            ->schema([
+                                Section::make('Timetable Reference')
+                                    ->schema([
+                                        FileUpload::make('timetable_file_id')
+                                            ->label('Upload Timetable Image')
+                                            ->image()
+                                            ->directory('classrooms/timetables'),
+                                    ]),
+                                
+                                Section::make('Weekly Schedule')
+                                    ->schema([
+                                        CheckboxList::make('active_days')
+                                            ->label('Select Active Days')
+                                            ->options([
+                                                0 => 'Sunday (א)',
+                                                1 => 'Monday (ב)',
+                                                2 => 'Tuesday (ג)',
+                                                3 => 'Wednesday (ד)',
+                                                4 => 'Thursday (ה)',
+                                                5 => 'Friday (ו)',
+                                                6 => 'Saturday (ש)',
+                                            ])
+                                            ->columns(7)
+                                            ->live(),
+
+                                        Repeater::make('timetableEntries')
+                                            ->relationship()
+                                            ->schema([
+                                                Select::make('day_of_week')
+                                                    ->options([
+                                                        0 => 'Sunday', 1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday',
+                                                        4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday'
+                                                    ])
+                                                    ->required(),
+                                                TextInput::make('subject')
+                                                    ->label('Lesson Name')
+                                                    ->required()
+                                                    ->live(onBlur: true),
+                                                TextInput::make('teacher')
+                                                    ->label('Teacher (Optional)'),
+                                                TextInput::make('special_message')
+                                                    ->label('Special Message'),
+                                            ])
+                                            ->columns(4)
+                                            ->reorderable('sort_order')
+                                            ->itemLabel(fn (array $state): ?string => ($state['subject'] ?? 'New Lesson') . ($state['teacher'] ? " ({$state['teacher']})" : ""))
+                                            ->collapsible()
+                                            ->collapsed()
+                                            ->addActionLabel('Add Lesson'),
+                                    ]),
+                            ]),
+
+                        // --- TAB: ADMINS ---
+                        Tabs\Tab::make('Classroom Admins')
+                            ->icon('heroicon-o-users')
+                            ->schema([
+                                Placeholder::make('manage_users_hint')
+                                    ->content('Manage users and their roles in the "Users" section below.'),
+                            ]),
+                    ])
+                    ->columnSpanFull()
+            ])->columns(1);
     }
 
     /**
@@ -103,32 +172,15 @@ class ClassroomResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('name')->searchable(),
+                Tables\Columns\TextColumn::make('city.name')->label('City'),
+                Tables\Columns\TextColumn::make('grade_level')->label('Grade'),
                 Tables\Columns\TextColumn::make('join_code'),
-                Tables\Columns\TextColumn::make('media_size_bytes')
-                    ->label('Media Size')
-                    ->formatStateUsing(fn (int $state): string => number_format($state / 1024 / 1024, 2) . ' MB'),
                 Tables\Columns\TextColumn::make('users_count')
                     ->counts('users')
                     ->label('Members'),
             ])
-            ->filters([
-                //
-            ])
             ->actions([
                 Tables\Actions\EditAction::make(),
-                Tables\Actions\Action::make('purge_media')
-                    ->label('Purge Media')
-                    ->icon('heroicon-o-trash')
-                    ->color('danger')
-                    ->requiresConfirmation()
-                    ->action(function (Classroom $record, FileStorageService $storageService) {
-                        $storageService->purgeClassroomFolder($record->id);
-                        
-                        Notification::make()
-                            ->title('Media purged successfully')
-                            ->success()
-                            ->send();
-                    }),
             ])
             ->bulkActions([
                 Tables\Actions\DeleteBulkAction::make(),
@@ -142,6 +194,11 @@ class ClassroomResource extends Resource
     {
         return [
             RelationManagers\UsersRelationManager::class,
+            RelationManagers\ImportantContactsRelationManager::class,
+            RelationManagers\ChildrenRelationManager::class,
+            RelationManagers\LinksRelationManager::class,
+            RelationManagers\HolidaysRelationManager::class,
+            RelationManagers\AnnouncementsRelationManager::class,
         ];
     }
 
