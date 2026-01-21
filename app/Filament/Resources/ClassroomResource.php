@@ -6,15 +6,12 @@ use App\Filament\Resources\ClassroomResource\Pages;
 use App\Filament\Resources\ClassroomResource\RelationManagers;
 use App\Models\Classroom;
 use App\Models\School;
-use App\Services\Storage\FileStorageService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Notifications\Notification;
 use Filament\Forms\Components\Tabs;
-use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -30,9 +27,6 @@ class ClassroomResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-academic-cap';
 
-    /**
-     * Define the form for creating/editing classrooms.
-     */
     public static function form(Form $form): Form
     {
         return $form
@@ -105,15 +99,15 @@ class ClassroomResource extends Resource
                         Tabs\Tab::make('Timetable')
                             ->icon('heroicon-o-calendar')
                             ->schema([
-                                Section::make('Timetable Reference')
+                                Section::make('Timetable Image')
                                     ->schema([
                                         FileUpload::make('timetable_file_id')
-                                            ->label('Upload Timetable Image')
+                                            ->label('Upload Image')
                                             ->image()
                                             ->directory('classrooms/timetables'),
                                     ]),
                                 
-                                Section::make('Weekly Schedule')
+                                Section::make('Configuration')
                                     ->schema([
                                         CheckboxList::make('active_days')
                                             ->label('Select Active Days')
@@ -128,79 +122,13 @@ class ClassroomResource extends Resource
                                             ])
                                             ->columns(7)
                                             ->live(),
-
-                                        Repeater::make('timetableEntries')
-                                            ->relationship()
-                                            ->schema([
-                                                Select::make('day_of_week')
-                                                    ->options([
-                                                        0 => 'Sunday', 1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday',
-                                                        4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday'
-                                                    ])
-                                                    ->required(),
-                                                TextInput::make('subject')
-                                                    ->label('Lesson Name')
-                                                    ->required()
-                                                    ->live(onBlur: true),
-                                                TextInput::make('teacher')
-                                                    ->label('Teacher (Optional)'),
-                                                TextInput::make('special_message')
-                                                    ->label('Special Message'),
-                                            ])
-                                            ->columns(4)
-                                            ->reorderable('sort_order')
-                                            ->itemLabel(fn (array $state): ?string => ($state['subject'] ?? 'New Lesson') . ($state['teacher'] ? " ({$state['teacher']})" : ""))
-                                            ->collapsible()
-                                            ->collapsed()
-                                            ->addActionLabel('Add Lesson'),
                                     ]),
-                            ]),
-
-                        // --- TAB: CONTACTS ---
-                        Tabs\Tab::make('Contacts')
-                            ->icon('heroicon-o-phone')
-                            ->schema([
-                                Repeater::make('importantContacts')
-                                    ->relationship()
-                                    ->schema([
-                                        TextInput::make('first_name')
-                                            ->label('First Name')
-                                            ->required(),
-                                        TextInput::make('last_name')
-                                            ->label('Last Name')
-                                            ->required(),
-                                        TextInput::make('role')
-                                            ->label('Role')
-                                            ->required(),
-                                        TextInput::make('phone')
-                                            ->label('Phone')
-                                            ->tel()
-                                            ->live(onBlur: true)
-                                            ->helperText(fn ($state) => $state && !preg_match('/^05\d{8}$/', $state) ? new HtmlString('<span class="text-warning-600 text-xs">Note: This does not look like a standard Israeli mobile number (e.g. 0503222012)</span>') : null),
-                                        TextInput::make('email')
-                                            ->label('Email')
-                                            ->email(),
-                                    ])
-                                    ->columns(2)
-                                    ->itemLabel(fn (array $state): ?string => ($state['first_name'] ?? '') . ' ' . ($state['last_name'] ?? '') . ($state['role'] ? " - {$state['role']}" : ""))
-                                    ->addActionLabel('Add Contact'),
-                            ]),
-
-                        // --- TAB: ADMINS ---
-                        Tabs\Tab::make('Classroom Admins')
-                            ->icon('heroicon-o-users')
-                            ->schema([
-                                Placeholder::make('manage_users_hint')
-                                    ->content('Manage users and their roles in the "Users" section below.'),
                             ]),
                     ])
                     ->columnSpanFull()
             ])->columns(1);
     }
 
-    /**
-     * Define the table for listing classrooms.
-     */
     public static function table(Table $table): Table
     {
         return $table
@@ -221,9 +149,6 @@ class ClassroomResource extends Resource
             ]);
     }
 
-    /**
-     * Define the relation managers for this resource.
-     */
     public static function getRelations(): array
     {
         return [
@@ -236,9 +161,6 @@ class ClassroomResource extends Resource
         ];
     }
 
-    /**
-     * Define the pages for this resource.
-     */
     public static function getPages(): array
     {
         return [
