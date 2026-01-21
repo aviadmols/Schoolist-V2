@@ -13,7 +13,7 @@
       <div v-for="item in announcements" :key="item.id" class="card">
         <div class="card__body flex items-start gap-4">
           <UiCheckbox 
-            v-model="item.is_done"
+            :model-value="item.is_done"
             @update:model-value="toggleDone(item)" 
           />
           <div :class="{ 'done-item': item.is_done }">
