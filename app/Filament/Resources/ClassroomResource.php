@@ -87,12 +87,16 @@ class ClassroomResource extends Resource
                                             ->required()
                                             ->default('Asia/Jerusalem'),
                                         Placeholder::make('classroom_url')
-                                            ->label('Classroom Link')
-                                            ->content(fn (?Classroom $record): ?HtmlString => $record ? new HtmlString("<a href='" . route('classroom.show', $record) . "' target='_blank' class='text-primary-600 underline'>View Classroom Page</a>") : null)
+                                            ->label('Classroom Dashboard')
+                                            ->content(fn (?Classroom $record): ?HtmlString => $record ? new HtmlString("<a href='" . route('classroom.show', $record) . "' target='_blank' class='text-primary-600 underline font-bold'>כניסה לדשבורד הכיתה ↗</a>") : null)
                                             ->visible(fn (?Classroom $record): bool => $record !== null),
                                         Placeholder::make('media_size_bytes')
                                             ->label('Media Size')
                                             ->content(fn (?Classroom $record): string => $record ? number_format($record->media_size_bytes / 1024 / 1024, 2) . ' MB' : '0.00 MB')
+                                            ->visible(fn (?Classroom $record): bool => $record !== null),
+                                        Placeholder::make('folder_path')
+                                            ->label('Storage Path')
+                                            ->content(fn (?Classroom $record): string => $record ? "public/classrooms/{$record->id}/" : 'N/A')
                                             ->visible(fn (?Classroom $record): bool => $record !== null),
                                     ])->columns(2),
                             ]),
