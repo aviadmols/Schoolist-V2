@@ -6,7 +6,7 @@
     </div>
 
     <div v-if="announcements.length === 0" class="card card__body">
-      <p class="text-muted">No active announcements for now.</p>
+      <p class="text-muted text-center">No active announcements for now.</p>
     </div>
 
     <div v-else class="stack">
@@ -16,7 +16,7 @@
             :model-value="item.is_done" 
             @update:model-value="toggleDone(item)" 
           />
-          <div :class="{ 'line-through opacity-60': item.is_done }">
+          <div :class="{ 'done-item': item.is_done }">
             <div class="flex items-center gap-2">
               <span class="text-xs uppercase font-bold text-muted">{{ item.type }}</span>
               <h3 class="text-body font-bold">{{ item.title }}</h3>
@@ -45,10 +45,10 @@
           <UiInput v-model="form.occurs_on_date" type="date" />
         </UiField>
 
-        <template #footer>
+        <div class="flex gap-3 justify-end mt-4">
+          <UiButton @click="showCreateModal = false" variant="ghost" type="button">Cancel</UiButton>
           <UiButton type="submit" variant="primary" :disabled="form.processing">Create</UiButton>
-          <UiButton @click="showCreateModal = false" variant="ghost">Cancel</UiButton>
-        </template>
+        </div>
       </form>
     </UiModal>
   </div>
@@ -113,7 +113,21 @@ function toggleDone(item) {
 </script>
 
 <style scoped>
-.line-through {
+.done-item {
   text-decoration: line-through;
+  opacity: 0.6;
 }
+.flex { display: flex; }
+.justify-between { justify-content: space-between; }
+.justify-end { justify-content: flex-end; }
+.items-center { align-items: center; }
+.items-start { align-items: flex-start; }
+.gap-2 { gap: 0.5rem; }
+.gap-3 { gap: 0.75rem; }
+.gap-4 { gap: 1rem; }
+.mt-1 { margin-top: 0.25rem; }
+.mt-4 { margin-top: 1rem; }
+.text-xs { font-size: 0.75rem; }
+.uppercase { text-transform: uppercase; }
+.font-bold { font-weight: 700; }
 </style>
