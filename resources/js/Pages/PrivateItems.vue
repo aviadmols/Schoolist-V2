@@ -41,12 +41,12 @@
           <p class="text-xs text-muted mt-1">If set, will only show from 16:00 the day before.</p>
         </UiField>
 
-        <template #footer>
+        <div class="flex gap-3 justify-end mt-4">
+          <UiButton @click="showModal = false" variant="ghost" type="button">Cancel</UiButton>
           <UiButton type="submit" variant="primary" :disabled="form.processing">
             {{ isEditing ? 'Update' : 'Create' }}
           </UiButton>
-          <UiButton @click="showModal = false" variant="ghost">Cancel</UiButton>
-        </template>
+        </div>
       </form>
     </UiModal>
   </div>
