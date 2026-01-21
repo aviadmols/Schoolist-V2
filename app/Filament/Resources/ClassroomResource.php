@@ -152,6 +152,36 @@ class ClassroomResource extends Resource
                                     ]),
                             ]),
 
+                        // --- TAB: CONTACTS ---
+                        Tabs\Tab::make('Contacts')
+                            ->icon('heroicon-o-phone')
+                            ->schema([
+                                Repeater::make('importantContacts')
+                                    ->relationship()
+                                    ->schema([
+                                        TextInput::make('first_name')
+                                            ->label('First Name')
+                                            ->required(),
+                                        TextInput::make('last_name')
+                                            ->label('Last Name')
+                                            ->required(),
+                                        TextInput::make('role')
+                                            ->label('Role')
+                                            ->required(),
+                                        TextInput::make('phone')
+                                            ->label('Phone')
+                                            ->tel()
+                                            ->live(onBlur: true)
+                                            ->helperText(fn ($state) => $state && !preg_match('/^05\d{8}$/', $state) ? new HtmlString('<span class="text-warning-600 text-xs">Note: This does not look like a standard Israeli mobile number (e.g. 0503222012)</span>') : null),
+                                        TextInput::make('email')
+                                            ->label('Email')
+                                            ->email(),
+                                    ])
+                                    ->columns(2)
+                                    ->itemLabel(fn (array $state): ?string => ($state['first_name'] ?? '') . ' ' . ($state['last_name'] ?? '') . ($state['role'] ? " - {$state['role']}" : ""))
+                                    ->addActionLabel('Add Contact'),
+                            ]),
+
                         // --- TAB: ADMINS ---
                         Tabs\Tab::make('Classroom Admins')
                             ->icon('heroicon-o-users')

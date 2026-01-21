@@ -10,9 +10,11 @@ class ImportantContact extends Model
     /** @var array<int, string> */
     protected $fillable = [
         'classroom_id',
-        'name',
-        'title',
+        'first_name',
+        'last_name',
+        'role',
         'phone',
+        'email',
     ];
 
     /**
