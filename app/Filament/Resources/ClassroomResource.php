@@ -86,7 +86,8 @@ class ClassroomResource extends Resource
                                                 0 => 'Sunday (א)', 1 => 'Monday (ב)', 2 => 'Tuesday (ג)', 
                                                 3 => 'Wednesday (ד)', 4 => 'Thursday (ה)', 5 => 'Friday (ו)', 6 => 'Saturday (ש)',
                                             ])
-                                            ->columns(7),
+                                            ->columns(7)
+                                            ->live(),
                                     ]),
 
                                 ...static::getDayRepeaterSchema(0, 'Sunday (יום א\')', 'sundayEntries'),
