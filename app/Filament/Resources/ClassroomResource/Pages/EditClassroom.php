@@ -5,12 +5,9 @@ namespace App\Filament\Resources\ClassroomResource\Pages;
 use App\Filament\Resources\ClassroomResource;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
-use Filament\Resources\Pages\EditRecord\Concerns\HasRelations;
 
 class EditClassroom extends EditRecord
 {
-    use HasRelations;
-
     protected static string $resource = ClassroomResource::class;
 
     protected function getHeaderActions(): array
@@ -18,15 +15,5 @@ class EditClassroom extends EditRecord
         return [
             Actions\DeleteAction::make(),
         ];
-    }
-
-    public function getContentTabLabel(): ?string
-    {
-        return 'General & Timetable';
-    }
-
-    public function hasCombinedRelationManagerTabsWithContent(): bool
-    {
-        return true;
     }
 }
