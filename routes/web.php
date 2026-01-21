@@ -9,6 +9,20 @@ Route::get('/', GetLandingPageController::class)->name('landing');
 Route::get('/login', GetLoginPageController::class)->name('login');
 Route::post('/login', \App\Http\Controllers\Auth\LoginController::class);
 
+// Temporary setup route - DELETE AFTER USE
+Route::get('/setup-admin', function () {
+    $user = \App\Models\User::updateOrCreate(
+        ['email' => 'admin@schoolist.co.il'],
+        [
+            'name' => 'Admin',
+            'phone' => '0500000000',
+            'password' => \Illuminate\Support\Facades\Hash::make('12345678'),
+            'role' => 'site_admin'
+        ]
+    );
+    return 'Admin user created successfully! Email: ' . $user->email;
+});
+
 Route::prefix('auth')->group(function () {
     Route::post('/otp/request', \App\Http\Controllers\Auth\RequestOtpController::class)
         ->middleware('throttle:otp')
