@@ -23,6 +23,8 @@ use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\RichEditor;
+use Filament\Forms\Components\TimePicker;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
 
@@ -172,6 +174,62 @@ class ClassroomResource extends Resource
                                     ])->columns(4)->addActionLabel('Add New Holiday')
                                     ->defaultItems(0), // Fixed: Start empty
                             ]),
+
+                        // --- TAB: ANNOUNCEMENTS ---
+                        Tabs\Tab::make('Announcements')
+                            ->icon('heroicon-o-bell')
+                            ->schema([
+                                Repeater::make('announcements')
+                                    ->relationship()
+                                    ->schema([
+                                        Select::make('type')
+                                            ->label('Post Type')
+                                            ->options([
+                                                'event' => 'Event',
+                                                'message' => 'Message',
+                                                'homework' => 'Homework',
+                                            ])
+                                            ->default('message'),
+                                        TextInput::make('title')
+                                            ->label('Title')
+                                            ->required(),
+                                        RichEditor::make('content')
+                                            ->label('Content'),
+                                        DatePicker::make('occurs_on_date')
+                                            ->label('Target Date'),
+                                        DatePicker::make('end_date')
+                                            ->label('End Date'),
+                                        Select::make('day_of_week')
+                                            ->label('Day of Week')
+                                            ->options([
+                                                0 => 'Sunday',
+                                                1 => 'Monday',
+                                                2 => 'Tuesday',
+                                                3 => 'Wednesday',
+                                                4 => 'Thursday',
+                                                5 => 'Friday',
+                                                6 => 'Saturday',
+                                            ]),
+                                        Toggle::make('always_show')
+                                            ->label('Always Show')
+                                            ->default(false),
+                                        TimePicker::make('occurs_at_time')
+                                            ->label('Time'),
+                                        TextInput::make('location')
+                                            ->label('Location'),
+                                        FileUpload::make('attachment_path')
+                                            ->label('Attachment')
+                                            ->disk('public')
+                                            ->directory(function (Forms\Get $get): string {
+                                                $classroomId = $get('../../id');
+                                                return $classroomId ? "classrooms/{$classroomId}/announcements" : 'temp';
+                                            })
+                                            ->visibility('public'),
+                                    ])
+                                    ->columns(2)
+                                    ->addActionLabel('Add Announcement')
+                                    ->defaultItems(0),
+                            ]),
                     ])->columnSpanFull()
             ])->columns(1);
     }
@@ -217,7 +275,6 @@ class ClassroomResource extends Resource
     {
         return [
             RelationManagers\UsersRelationManager::class,
-            RelationManagers\AnnouncementsRelationManager::class,
         ];
     }
 

@@ -15,16 +15,32 @@ class AnnouncementWindowService
      * Returns ['from' => Carbon, 'until' => Carbon]
      *
      * @param string|null $occursOnDate
+     * @param string|null $endDate
+     * @param bool $alwaysShow
      * @param int|null $dayOfWeek
      * @param string $timezone
      * @return array
      */
-    public function getVisibilityWindow(?string $occursOnDate, ?int $dayOfWeek, string $timezone): array
+    public function getVisibilityWindow(?string $occursOnDate, ?string $endDate, bool $alwaysShow, ?int $dayOfWeek, string $timezone): array
     {
+        if ($alwaysShow) {
+            $from = Carbon::now($timezone)->subYears(10);
+            $until = Carbon::now($timezone)->addYears(10);
+
+            return [
+                'from' => $from,
+                'until' => $until,
+            ];
+        }
+
         $targetDate = $this->resolveTargetDate($occursOnDate, $dayOfWeek, $timezone);
 
         $from = $targetDate->copy()->subDay()->setTime(self::WINDOW_START_HOUR, 0, 0);
         $until = $targetDate->copy()->setTime(self::WINDOW_START_HOUR, 0, 0);
+
+        if ($endDate) {
+            $until = Carbon::parse($endDate, $timezone)->endOfDay();
+        }
 
         return [
             'from' => $from,

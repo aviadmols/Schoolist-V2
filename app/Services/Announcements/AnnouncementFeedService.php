@@ -33,6 +33,8 @@ class AnnouncementFeedService
             ->filter(function (Announcement $announcement) use ($classroom, $now) {
                 $window = $this->windowService->getVisibilityWindow(
                     $announcement->occurs_on_date?->toDateString(),
+                    $announcement->end_date?->toDateString(),
+                    (bool) $announcement->always_show,
                     $announcement->day_of_week,
                     $classroom->timezone
                 );
@@ -45,6 +47,9 @@ class AnnouncementFeedService
                     'type' => $announcement->type,
                     'title' => $announcement->title,
                     'content' => $announcement->content,
+                    'occurs_at_time' => $announcement->occurs_at_time,
+                    'location' => $announcement->location,
+                    'attachment_path' => $announcement->attachment_path,
                     'is_done' => $announcement->currentUserStatus?->done_at !== null,
                 ];
             })
