@@ -31,30 +31,43 @@ class ClassroomResource extends Resource
                         Forms\Components\TextInput::make('name')
                             ->required()
                             ->maxLength(255),
-                        Forms\Components\TextInput::make('city')
+                        Forms\Components\Select::make('city_id')
                             ->label('City')
-                            ->maxLength(255),
-                        Forms\Components\TextInput::make('school_name')
+                            ->relationship('city', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->live(),
+                        Forms\Components\Select::make('school_id')
                             ->label('School Name')
-                            ->maxLength(255),
-                        Forms\Components\Select::make('grade_level')
-                            ->label('Grade Level')
-                            ->options([
-                                'א' => "כיתה א'",
-                                'ב' => "כיתה ב'",
-                                'ג' => "כיתה ג'",
-                                'ד' => "כיתה ד'",
-                                'ה' => "כיתה ה'",
-                                'ו' => "כיתה ו'",
-                                'ז' => "כיתה ז'",
-                                'ח' => "כיתה ח'",
-                                'ט' => "כיתה ט'",
-                                'י' => "כיתה י'",
-                                'יא' => "כיתה י\"א",
-                                'יב' => "כיתה י\"ב",
-                                'other' => 'אחר',
-                            ])
-                            ->searchable(),
+                            ->options(fn (Forms\Get $get): \Illuminate\Support\Collection => \App\Models\School::where('city_id', $get('city_id'))->pluck('name', 'id'))
+                            ->searchable()
+                            ->preload()
+                            ->hidden(fn (Forms\Get $get): bool => ! $get('city_id')),
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\Select::make('grade_level')
+                                    ->label('Grade Letter')
+                                    ->options([
+                                        'א' => "א'",
+                                        'ב' => "ב'",
+                                        'ג' => "ג'",
+                                        'ד' => "ד'",
+                                        'ה' => "ה'",
+                                        'ו' => "ו'",
+                                        'ז' => "ז'",
+                                        'ח' => "ח'",
+                                        'ט' => "ט'",
+                                        'י' => "י'",
+                                        'יא' => "י\"א",
+                                        'יב' => "י\"ב",
+                                        'other' => 'אחר',
+                                    ])
+                                    ->required(),
+                                Forms\Components\Select::make('grade_number')
+                                    ->label('Grade Number')
+                                    ->options(array_combine(range(1, 20), range(1, 20)))
+                                    ->nullable(),
+                            ]),
                     ])->columns(2),
 
                 Forms\Components\Section::make('System Details')
@@ -69,6 +82,10 @@ class ClassroomResource extends Resource
                         Forms\Components\Placeholder::make('media_size_bytes')
                             ->label('Media Size')
                             ->content(fn (?Classroom $record): string => $record ? number_format($record->media_size_bytes / 1024 / 1024, 2) . ' MB' : '0.00 MB')
+                            ->visible(fn (?Classroom $record): bool => $record !== null),
+                        Forms\Components\Placeholder::make('classroom_url')
+                            ->label('Classroom Link')
+                            ->content(fn (?Classroom $record): ?\Illuminate\Support\HtmlString => $record ? new \Illuminate\Support\HtmlString("<a href='" . route('classroom.show', $record) . "' target='_blank' class='text-primary-600 underline'>View Classroom Page</a>") : null)
                             ->visible(fn (?Classroom $record): bool => $record !== null),
                         Forms\Components\Placeholder::make('folder_path')
                             ->label('Storage Path')

@@ -3,17 +3,17 @@
     <!-- Header -->
     <div class="flex items-center justify-between px-4 pt-6">
       <div class="flex items-center gap-2">
-        <div class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 font-bold">
-          ג'4
+        <div class="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 font-bold text-lg">
+          {{ classroom.grade_level }}'{{ classroom.grade_number }}
         </div>
         <div>
-          <h2 class="text-sm font-bold m-0">{{ classroom.name }}</h2>
+          <h2 class="text-sm font-bold m-0">{{ classroom.school_name || classroom.name }}</h2>
           <span class="text-xs text-muted">2025-2026</span>
         </div>
       </div>
       <div class="flex gap-4">
-        <button class="text-muted"><i class="icon-edit"></i></button>
         <button class="text-muted"><i class="icon-user"></i></button>
+        <button class="text-muted"><i class="icon-edit"></i></button>
       </div>
     </div>
 
@@ -44,8 +44,8 @@
     </div>
 
     <!-- Announcements -->
-    <div class="px-4 stack">
-      <div class="flex items-center justify-between">
+    <div class="px-4 stack mt-6">
+      <div class="flex items-center justify-between mb-2">
         <h3 class="text-body font-bold m-0">הודעות</h3>
         <button class="text-muted text-xs"><i class="icon-edit"></i></button>
       </div>
@@ -53,8 +53,8 @@
       <div v-if="announcements.length === 0" class="text-muted text-sm py-4 text-center">
         אין הודעות פעילות
       </div>
-      <div v-else class="stack gap-2">
-        <div v-for="item in announcements" :key="item.id" class="flex items-start gap-3 py-2 border-b border-gray-50 last:border-0">
+      <div v-else class="card stack gap-0 p-0 overflow-hidden">
+        <div v-for="item in announcements" :key="item.id" class="flex items-start gap-3 p-4 border-b border-gray-50 last:border-0">
           <UiCheckbox :model-value="item.is_done" @update:model-value="toggleAnnouncement(item)" />
           <div :class="{ 'line-through opacity-50': item.is_done }">
             <p class="text-sm font-medium m-0">{{ item.title }}</p>
@@ -63,8 +63,8 @@
       </div>
 
       <!-- Quick Add Button -->
-      <button @click="showQuickAdd = true" class="w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-lg self-start mt-2">
-        <span class="text-2xl">+</span>
+      <button @click="showQuickAdd = true" class="w-14 h-14 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-lg fixed bottom-6 left-6 z-10">
+        <span class="text-3xl">+</span>
       </button>
     </div>
 
@@ -189,5 +189,13 @@ function toggleAnnouncement(item) {
 .line-through { text-decoration: line-through; }
 .opacity-50 { opacity: 0.5; }
 .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+.fixed { position: fixed; }
+.bottom-6 { bottom: 1.5rem; }
+.left-6 { left: 1.5rem; }
+.z-10 { z-index: 10; }
+.text-3xl { font-size: 1.875rem; }
+.overflow-hidden { overflow: hidden; }
+.p-0 { padding: 0; }
+.p-4 { padding: 1rem; }
 .self-start { align-self: flex-start; }
 </style>

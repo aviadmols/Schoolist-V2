@@ -36,6 +36,10 @@ class DashboardController extends Controller
             'classroom' => [
                 'id' => $classroom->id,
                 'name' => $classroom->name,
+                'grade_level' => $classroom->grade_level,
+                'grade_number' => $classroom->grade_number,
+                'city_name' => $classroom->city?->name,
+                'school_name' => $classroom->school?->name,
             ],
             'selected_day' => (int) $dayOfWeek,
             'timetable' => $this->timetableService->getEntriesForDay($classroom, (int) $dayOfWeek),

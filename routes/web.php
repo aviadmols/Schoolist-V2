@@ -36,8 +36,20 @@ Route::prefix('auth')->group(function () {
 });
 
 Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
+    $classroom->load(['city', 'school']);
     return \Inertia\Inertia::render('Dashboard', [
-        'classroom' => $classroom
+        'classroom' => [
+            'id' => $classroom->id,
+            'name' => $classroom->name,
+            'grade_level' => $classroom->grade_level,
+            'grade_number' => $classroom->grade_number,
+            'city_name' => $classroom->city?->name,
+            'school_name' => $classroom->school?->name,
+        ],
+        'selected_day' => (int) now()->dayOfWeek,
+        'timetable' => [], // Add dummy or load real if needed
+        'announcements' => [],
+        'timetable_image' => null,
     ]);
 })->name('classroom.show');
 

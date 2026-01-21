@@ -39,10 +39,27 @@ class Classroom extends Model
         'timezone',
         'media_size_bytes',
         'timetable_file_id',
-        'city',
-        'school_name',
+        'city_id',
+        'school_id',
         'grade_level',
+        'grade_number',
     ];
+
+    /**
+     * The city this classroom belongs to.
+     */
+    public function city(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(City::class);
+    }
+
+    /**
+     * The school this classroom belongs to.
+     */
+    public function school(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(School::class);
+    }
 
     /**
      * Users belonging to this classroom.
