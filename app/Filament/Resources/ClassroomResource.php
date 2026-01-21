@@ -37,14 +37,15 @@ class ClassroomResource extends Resource
             ->schema([
                 Tabs::make('Classroom Management')
                     ->tabs([
-                        // --- TAB: GENERAL ---
-                        Tabs\Tab::make('General Settings')
+                        // --- TAB: GENERAL SETTINGS ---
+                        Tabs\Tab::make('General')
                             ->icon('heroicon-o-cog')
                             ->schema([
                                 Section::make('Basic Information')
                                     ->schema([
                                         TextInput::make('name')->required()->maxLength(255),
-                                        Select::make('city_id')->relationship('city', 'name')->searchable()->preload()->live(),
+                                        // Removed .live() to prevent auto-saving/re-rendering
+                                        Select::make('city_id')->relationship('city', 'name')->searchable()->preload(),
                                         Select::make('school_id')
                                             ->options(fn (Forms\Get $get) => School::where('city_id', $get('city_id'))->pluck('name', 'id'))
                                             ->searchable()->preload()->hidden(fn (Forms\Get $get) => ! $get('city_id')),
@@ -75,14 +76,15 @@ class ClassroomResource extends Resource
                                             ->image()
                                             ->disk('public')
                                             ->directory(fn (?Classroom $record) => $record ? "classrooms/{$record->id}/timetable" : "temp")
-                                            ->visibility('public'),
+                                            ->visibility('public')
+                                            ->live(false), // Disable live updates for file upload
                                         CheckboxList::make('active_days')
                                             ->label('Select Active Days')
                                             ->options([
                                                 0 => 'Sunday (א)', 1 => 'Monday (ב)', 2 => 'Tuesday (ג)', 
                                                 3 => 'Wednesday (ד)', 4 => 'Thursday (ה)', 5 => 'Friday (ו)', 6 => 'Saturday (ש)',
                                             ])
-                                            ->columns(7)->live(),
+                                            ->columns(7), // Removed .live() - requires Save to show/hide sections
                                     ]),
 
                                 ...static::getDayRepeaterSchema(0, 'Sunday (יום א\')', 'sundayEntries'),
