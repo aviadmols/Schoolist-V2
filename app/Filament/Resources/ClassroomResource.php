@@ -264,8 +264,12 @@ class ClassroomResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('name')->searchable(),
                 Tables\Columns\TextColumn::make('city.name')->label('City'),
+                Tables\Columns\TextColumn::make('school.name')->label('School'),
                 Tables\Columns\TextColumn::make('grade_level')->label('Grade'),
                 Tables\Columns\TextColumn::make('join_code'),
+                Tables\Columns\TextColumn::make('media_size_bytes')
+                    ->label('Media Size')
+                    ->formatStateUsing(fn (int $state): string => number_format($state / 1024 / 1024, 2) . ' MB'),
             ])
             ->actions([Tables\Actions\EditAction::make()])
             ->bulkActions([Tables\Actions\DeleteBulkAction::make()]);
