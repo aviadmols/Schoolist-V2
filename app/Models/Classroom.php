@@ -44,6 +44,7 @@ class Classroom extends Model
         'grade_level',
         'grade_number',
         'active_days',
+        'timetable_image_path',
     ];
 
     /** @var array<string, string> */

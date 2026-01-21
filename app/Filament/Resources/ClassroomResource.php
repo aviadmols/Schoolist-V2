@@ -44,7 +44,6 @@ class ClassroomResource extends Resource
                                 Section::make('Basic Information')
                                     ->schema([
                                         TextInput::make('name')->required()->maxLength(255),
-                                        // Removed .live() from city and other fields
                                         Select::make('city_id')->relationship('city', 'name')->searchable()->preload(),
                                         Select::make('school_id')
                                             ->options(fn (Forms\Get $get) => School::where('city_id', $get('city_id'))->pluck('name', 'id'))
@@ -65,7 +64,7 @@ class ClassroomResource extends Resource
                                         Placeholder::make('media_size_bytes')
                                             ->label('Media Size')
                                             ->content(fn (?Classroom $record): string => $record ? number_format($record->media_size_bytes / 1024 / 1024, 2) . ' MB' : '0.00 MB')
-                                            ->visible(fn (?Classroom $record): bool => $record !== null),
+                                            ->visible(fn (?Classroom $record) => $record !== null),
                                     ])->columns(2),
                             ]),
 
@@ -75,7 +74,7 @@ class ClassroomResource extends Resource
                             ->schema([
                                 Section::make('Configuration')
                                     ->schema([
-                                        FileUpload::make('timetable_file_id')
+                                        FileUpload::make('timetable_image_path') // Fixed: Using string column
                                             ->label('Upload Timetable Image')
                                             ->image()
                                             ->disk('public')
@@ -87,7 +86,7 @@ class ClassroomResource extends Resource
                                                 0 => 'Sunday (א)', 1 => 'Monday (ב)', 2 => 'Tuesday (ג)', 
                                                 3 => 'Wednesday (ד)', 4 => 'Thursday (ה)', 5 => 'Friday (ו)', 6 => 'Saturday (ש)',
                                             ])
-                                            ->columns(7), // Removed .live() to prevent unwanted server calls
+                                            ->columns(7),
                                     ]),
 
                                 ...static::getDayRepeaterSchema(0, 'Sunday (יום א\')', 'sundayEntries'),
@@ -100,7 +99,7 @@ class ClassroomResource extends Resource
                             ]),
 
                         // --- TAB: CONTACTS ---
-                        Tabs\Tab::make('Important Contacts')
+                        Tabs\Tab::make('Contacts')
                             ->icon('heroicon-o-phone')
                             ->schema([
                                 Repeater::make('importantContacts')
@@ -112,7 +111,8 @@ class ClassroomResource extends Resource
                                         TextInput::make('phone')->label('Phone')->tel()
                                             ->helperText(fn ($state) => $state && !preg_match('/^05\d{8}$/', $state) ? new HtmlString('<span class="text-warning-600 text-xs">Note: Standard format is 050-0000000</span>') : null),
                                         TextInput::make('email')->label('Email')->email(),
-                                    ])->columns(2)->addActionLabel('Add New Contact'),
+                                    ])->columns(2)->addActionLabel('Add New Contact')
+                                    ->defaultItems(0), // Fixed: Start empty
                             ]),
 
                         // --- TAB: CHILDREN ---
@@ -126,7 +126,8 @@ class ClassroomResource extends Resource
                                         TextInput::make('last_name')->required(),
                                         DatePicker::make('birthday')->label('Birthday'),
                                         Textarea::make('notes')->label('Medical/Other Notes')->rows(2),
-                                    ])->columns(2)->addActionLabel('Add New Child'),
+                                    ])->columns(2)->addActionLabel('Add New Child')
+                                    ->defaultItems(0), // Fixed: Start empty
                             ]),
 
                         // --- TAB: LINKS ---
@@ -139,7 +140,8 @@ class ClassroomResource extends Resource
                                         TextInput::make('title')->label('Title')->required(),
                                         TextInput::make('url')->label('URL')->url()->required(),
                                         TextInput::make('category')->label('Category')->placeholder('e.g. Homework'),
-                                    ])->columns(3)->addActionLabel('Add New Link'),
+                                    ])->columns(3)->addActionLabel('Add New Link')
+                                    ->defaultItems(0), // Fixed: Start empty
                             ]),
 
                         // --- TAB: HOLIDAYS ---
@@ -153,7 +155,8 @@ class ClassroomResource extends Resource
                                         DatePicker::make('start_date')->label('Start Date')->required(),
                                         DatePicker::make('end_date')->label('End Date')->required(),
                                         Toggle::make('is_no_school')->label('Is Summer Camp (יש קייטנה)')->default(false),
-                                    ])->columns(4)->addActionLabel('Add New Holiday'),
+                                    ])->columns(4)->addActionLabel('Add New Holiday')
+                                    ->defaultItems(0), // Fixed: Start empty
                             ]),
                     ])->columnSpanFull()
             ])->columns(1);
@@ -178,7 +181,7 @@ class ClassroomResource extends Resource
                         ->columns(3)
                         ->reorderable('sort_order')
                         ->addActionLabel('Add Lesson for ' . $label)
-                        ->defaultItems(1),
+                        ->defaultItems(0), // Fixed: Start empty
                 ]),
         ];
     }
