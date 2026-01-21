@@ -94,6 +94,15 @@ class Classroom extends Model
         return $this->hasMany(TimetableEntry::class)->orderBy('sort_order');
     }
 
+    // Filtered relationships for each day
+    public function sundayEntries(): HasMany { return $this->hasMany(TimetableEntry::class)->where('day_of_week', 0)->orderBy('sort_order'); }
+    public function mondayEntries(): HasMany { return $this->hasMany(TimetableEntry::class)->where('day_of_week', 1)->orderBy('sort_order'); }
+    public function tuesdayEntries(): HasMany { return $this->hasMany(TimetableEntry::class)->where('day_of_week', 2)->orderBy('sort_order'); }
+    public function wednesdayEntries(): HasMany { return $this->hasMany(TimetableEntry::class)->where('day_of_week', 3)->orderBy('sort_order'); }
+    public function thursdayEntries(): HasMany { return $this->hasMany(TimetableEntry::class)->where('day_of_week', 4)->orderBy('sort_order'); }
+    public function fridayEntries(): HasMany { return $this->hasMany(TimetableEntry::class)->where('day_of_week', 5)->orderBy('sort_order'); }
+    public function saturdayEntries(): HasMany { return $this->hasMany(TimetableEntry::class)->where('day_of_week', 6)->orderBy('sort_order'); }
+
     /**
      * Holidays for this classroom.
      */
