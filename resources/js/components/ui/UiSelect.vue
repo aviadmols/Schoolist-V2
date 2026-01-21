@@ -17,18 +17,9 @@
 <script setup>
 const emit = defineEmits(['update:modelValue']);
 
-/**
- * Provide an empty options list.
- *
- * @returns {Array}
- */
-function getEmptyUiSelectOptions() {
-  return [];
-}
-
 const props = defineProps({
   modelValue: { type: [String, Number], default: '' },
-  options: { type: Array, default: getEmptyUiSelectOptions },
+  options: { type: Array, default: () => [] },
   placeholder: { type: String, default: '' },
   disabled: { type: Boolean, default: false },
 });
@@ -44,4 +35,3 @@ function onChange(event) {
   emit('update:modelValue', target ? target.value : '');
 }
 </script>
-
