@@ -35,6 +35,14 @@ class OtpService
     }
 
     /**
+     * Generate a one-time OTP without sending SMS.
+     */
+    public function generateManual(string $phone): string
+    {
+        return $this->generate($phone);
+    }
+
+    /**
      * Verify the OTP for the given phone.
      */
     public function verify(string $phone, string $code): bool

@@ -34,7 +34,7 @@ class RequestOtpController
         SendOtpSmsJob::dispatch($phone, $code);
 
         return response()->json([
-            'message' => 'OTP sent successfully.',
+            'message' => 'הקוד נשלח בהצלחה.',
         ]);
     }
 }

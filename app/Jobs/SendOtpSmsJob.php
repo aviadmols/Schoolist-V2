@@ -33,7 +33,7 @@ class SendOtpSmsJob implements ShouldQueue
      */
     public function handle(SmsService $smsService): void
     {
-        $message = "Your Schoolist code is: {$this->code}";
+        $message = "קוד האימות שלך הוא: {$this->code}";
         $smsService->send($this->phone, $message);
     }
 }

@@ -2,12 +2,15 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\GetLoginPageController;
+use App\Http\Controllers\Auth\GetOtpLoginPageController;
+use App\Http\Controllers\Auth\QlinkController;
 use App\Http\Controllers\Public\GetLandingPageController;
 
 Route::get('/', GetLandingPageController::class)->name('landing');
 
 Route::get('/login', GetLoginPageController::class)->name('login');
 Route::post('/login', \App\Http\Controllers\Auth\LoginController::class);
+Route::get('/auth/code', GetOtpLoginPageController::class)->name('auth.code');
 
 // Temporary setup route - DELETE AFTER USE
 Route::get('/setup-admin', function () {
@@ -34,6 +37,13 @@ Route::prefix('auth')->group(function () {
     Route::post('/register', \App\Http\Controllers\Auth\RegisterController::class)
         ->name('auth.register');
 });
+
+Route::get('/qlink/{token}', [QlinkController::class, 'show'])->name('qlink.show');
+Route::post('/qlink/request', [QlinkController::class, 'requestOtp'])->name('qlink.request');
+Route::post('/qlink/verify', [QlinkController::class, 'verifyOtp'])->name('qlink.verify');
+Route::post('/qlink/register', [QlinkController::class, 'register'])->name('qlink.register');
+Route::post('/qlink/join', [QlinkController::class, 'join'])->name('qlink.join');
+Route::post('/qlink/auto', [QlinkController::class, 'autoLogin'])->name('qlink.auto');
 
 Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
     $classroom->load(['city', 'school']);

@@ -31,7 +31,7 @@ class VerifyOtpController
             ]);
 
             throw ValidationException::withMessages([
-                'code' => ['The provided code is invalid or has expired.'],
+                'code' => ['הקוד שגוי או שפג תוקפו.'],
             ]);
         }
 
@@ -41,7 +41,7 @@ class VerifyOtpController
             return response()->json([
                 'requires_registration' => true,
                 'phone' => $phone,
-                'message' => 'User not found. Please complete registration.',
+                'message' => 'לא נמצא משתמש עם המספר הזה. יש להשלים רישום.',
             ]);
         }
 

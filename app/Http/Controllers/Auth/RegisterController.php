@@ -17,8 +17,9 @@ class RegisterController
     {
         $request->validate([
             'phone' => ['required', 'string', 'regex:/^[0-9]{10}$/'],
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'unique:users,email'],
+            'first_name' => ['required', 'string', 'max:255'],
+            'last_name' => ['required', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'unique:users,email'],
         ]);
 
         // Ensure the phone was actually verified recently
@@ -28,12 +29,16 @@ class RegisterController
             ->exists();
 
         if (!$verified) {
-            return response()->json(['message' => 'Phone not verified.'], 403);
+            return response()->json(['message' => 'הטלפון לא אומת.'], 403);
         }
+
+        $name = trim($request->first_name . ' ' . $request->last_name);
 
         $user = User::create([
             'phone' => $request->phone,
-            'name' => $request->name,
+            'name' => $name,
+            'first_name' => $request->first_name,
+            'last_name' => $request->last_name,
             'email' => $request->email,
             'role' => 'user',
         ]);
@@ -45,8 +50,6 @@ class RegisterController
             'request_id' => $request->header('X-Request-Id'),
         ]);
 
-        return response()->json([
-            'redirect' => route('landing'),
-        ]);
+        return response()->json(['redirect' => route('landing')]);
     }
 }

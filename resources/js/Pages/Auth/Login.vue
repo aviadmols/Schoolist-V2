@@ -1,25 +1,29 @@
 <template>
   <div class="stack">
     <div>
-      <h1 class="text-title">Sign in</h1>
-      <p class="text-muted">This page demonstrates the AuthLayout and UI kit.</p>
+      <h1 class="text-title">בואו נתחבר</h1>
+      <p class="text-muted">כניסה עם אימייל וסיסמה.</p>
     </div>
 
     <form class="stack" @submit.prevent="submitLoginForm">
       <div v-if="error" class="text-danger text-sm">{{ error }}</div>
 
-      <UiField label="Email">
+      <UiField label="אימייל">
         <UiInput v-model="email" type="email" placeholder="name@example.com" />
       </UiField>
 
-      <UiField label="Password">
+      <UiField label="סיסמה">
         <UiInput v-model="password" type="password" placeholder="••••••••" />
       </UiField>
 
-      <UiCheckbox v-model="remember">Remember me</UiCheckbox>
+      <UiCheckbox v-model="remember">זכור אותי</UiCheckbox>
 
       <UiButton type="submit" variant="primary" :disabled="isSubmitting">
-        Continue
+        התחברות
+      </UiButton>
+
+      <UiButton variant="ghost" href="/auth/code" class="text-sm">
+        התחבר עם קוד
       </UiButton>
     </form>
   </div>

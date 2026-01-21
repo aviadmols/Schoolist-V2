@@ -2,6 +2,7 @@
 
 namespace App\Services\Sms;
 
+use App\Models\SmsSetting;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -18,9 +19,11 @@ class Sms019Provider implements SmsProviderInterface
 
     public function __construct()
     {
-        $this->username = config('services.sms019.username');
-        $this->password = config('services.sms019.password');
-        $this->sender = config('services.sms019.sender');
+        $settings = SmsSetting::where('provider', 'sms019')->first();
+
+        $this->username = $settings?->username ?? (string) config('services.sms019.username');
+        $this->password = $settings?->password ?? (string) config('services.sms019.password');
+        $this->sender = $settings?->sender ?? (string) config('services.sms019.sender');
     }
 
     /**
