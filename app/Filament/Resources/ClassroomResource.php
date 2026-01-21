@@ -38,10 +38,12 @@ class ClassroomResource extends Resource
                     ->default('Asia/Jerusalem'),
                 Forms\Components\Placeholder::make('media_size_bytes')
                     ->label('Media Size')
-                    ->content(fn (Classroom $record): string => number_format($record->media_size_bytes / 1024 / 1024, 2) . ' MB'),
+                    ->content(fn (?Classroom $record): string => $record ? number_format($record->media_size_bytes / 1024 / 1024, 2) . ' MB' : '0.00 MB')
+                    ->visible(fn (?Classroom $record): bool => $record !== null),
                 Forms\Components\Placeholder::make('folder_path')
                     ->label('Storage Path')
-                    ->content(fn (Classroom $record): string => "public/classrooms/{$record->id}/"),
+                    ->content(fn (?Classroom $record): string => $record ? "public/classrooms/{$record->id}/" : 'N/A')
+                    ->visible(fn (?Classroom $record): bool => $record !== null),
             ]);
     }
 
