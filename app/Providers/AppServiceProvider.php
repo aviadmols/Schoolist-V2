@@ -22,20 +22,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Ensure framework directories exist for Railway/Production
-        $paths = [
-            storage_path('framework/cache/data'),
-            storage_path('framework/sessions'),
-            storage_path('framework/views'),
-            storage_path('app/livewire-tmp'),
-        ];
-
-        foreach ($paths as $path) {
-            if (!file_exists($path)) {
-                mkdir($path, 0777, true);
-            }
-        }
-
         if ($this->app->environment('production')) {
             \Illuminate\Support\Facades\URL::forceScheme('https');
         }
