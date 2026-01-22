@@ -21,15 +21,20 @@ class SmsService
      */
     public function send(string $phone, string $message): bool
     {
-        $success = $this->provider->send($phone, $message);
-
-        SmsLog::create([
+        $log = SmsLog::create([
             'provider' => 'sms019',
             'phone_mask' => $this->maskPhone($phone),
-            'status' => $success ? 'sent' : 'failed',
+            'status' => 'attempt',
             'request_id' => Request::header('X-Request-Id'),
             'user_id' => auth()->id(),
             'classroom_id' => Request::get('current_classroom')?->id,
+            'error_message' => null,
+        ]);
+
+        $success = $this->provider->send($phone, $message);
+
+        $log->update([
+            'status' => $success ? 'sent' : 'failed',
             'error_message' => $success ? null : 'Provider returned failure',
         ]);
 

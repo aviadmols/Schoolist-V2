@@ -8,6 +8,7 @@ use App\Models\AuthToken;
 use App\Models\OtpCode;
 use App\Models\Qlink;
 use App\Models\QlinkVisit;
+use App\Models\SmsLog;
 use App\Models\User;
 use App\Services\Auth\OtpService;
 use App\Services\Classroom\ClassroomContextService;
@@ -66,6 +67,17 @@ class QlinkController extends Controller
         $this->assertValidToken($request->qlink_token);
 
         $code = $otpService->generate($request->phone);
+
+        SmsLog::create([
+            'provider' => 'sms019',
+            'phone_mask' => substr($request->phone, 0, 3) . '****' . substr($request->phone, -3),
+            'status' => 'queued',
+            'request_id' => $request->header('X-Request-Id'),
+            'user_id' => auth()->id(),
+            'classroom_id' => $request->attributes->get('current_classroom')?->id,
+            'error_message' => null,
+        ]);
+
         SendOtpSmsJob::dispatch($request->phone, $code);
 
         return response()->json(['message' => 'הקוד נשלח בהצלחה.']);
