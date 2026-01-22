@@ -31,11 +31,13 @@ class SmsService
             'error_message' => null,
         ]);
 
-        $success = $this->provider->send($phone, $message);
+        $result = $this->provider->send($phone, $message);
+        $success = $result->isSuccess();
 
         $log->update([
             'status' => $success ? 'sent' : 'failed',
-            'error_message' => $success ? null : 'Provider returned failure',
+            'error_message' => $success ? null : ($result->getErrorMessage() ?: 'Provider returned failure'),
+            'provider_response' => $this->formatProviderResponse($result),
         ]);
 
         return $success;
@@ -51,19 +53,13 @@ class SmsService
             'error_message' => null,
         ]);
 
-        try {
-            $success = $this->provider->send($phone, $message);
-        } catch (\Exception $exception) {
-            $log->update([
-                'status' => 'failed',
-                'error_message' => $exception->getMessage(),
-            ]);
-            return false;
-        }
+        $result = $this->provider->send($phone, $message);
+        $success = $result->isSuccess();
 
         $log->update([
             'status' => $success ? 'sent' : 'failed',
-            'error_message' => $success ? null : 'Provider returned failure',
+            'error_message' => $success ? null : ($result->getErrorMessage() ?: 'Provider returned failure'),
+            'provider_response' => $this->formatProviderResponse($result),
         ]);
 
         return $success;
@@ -90,5 +86,38 @@ class SmsService
         }
 
         return substr($phone, 0, 3) . '****' . substr($phone, -3);
+    }
+
+    /**
+     * Format provider response for logging.
+     */
+    private function formatProviderResponse(SmsSendResult $result): string
+    {
+        $payload = [
+            'success' => $result->isSuccess(),
+            'status_code' => $result->getStatusCode(),
+            'error' => $result->getErrorMessage(),
+            'body' => $this->truncateResponseBody($result->getResponseBody()),
+        ];
+
+        return json_encode($payload, JSON_UNESCAPED_SLASHES) ?: '';
+    }
+
+    /**
+     * Truncate response body for storage.
+     */
+    private function truncateResponseBody(?string $body): ?string
+    {
+        if (!$body) {
+            return null;
+        }
+
+        $maxLength = 2000;
+
+        if (strlen($body) <= $maxLength) {
+            return $body;
+        }
+
+        return substr($body, 0, $maxLength).'...';
     }
 }

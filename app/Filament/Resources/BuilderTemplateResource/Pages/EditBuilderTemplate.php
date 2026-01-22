@@ -20,8 +20,9 @@ class EditBuilderTemplate extends EditRecord
     protected function getFormActions(): array
     {
         return [
-            Actions\SaveAction::make()
-                ->label('Save Draft'),
+            Actions\Action::make('saveDraft')
+                ->label('Save Draft')
+                ->action('save'),
         ];
     }
 

@@ -7,5 +7,5 @@ interface SmsProviderInterface
     /**
      * Send an SMS message.
      */
-    public function send(string $phone, string $message): bool;
+    public function send(string $phone, string $message): SmsSendResult;
 }

@@ -29,11 +29,11 @@ class Sms019Provider implements SmsProviderInterface
     /**
      * Send an SMS via 019 provider.
      */
-    public function send(string $phone, string $message): bool
+    public function send(string $phone, string $message): SmsSendResult
     {
         if (!$this->username || !$this->password || !$this->sender) {
             Log::error('SMS019 settings are incomplete. Cannot send SMS.');
-            return false;
+            return new SmsSendResult(false, null, null, 'Missing SMS019 settings.');
         }
 
         $payload = [
@@ -65,10 +65,15 @@ class Sms019Provider implements SmsProviderInterface
                 'Content-Type' => 'application/json',
             ])->post('https://019sms.co.il/api', $payload);
 
-            return $response->successful();
+            return new SmsSendResult(
+                $response->successful(),
+                $response->status(),
+                $response->body(),
+                null
+            );
         } catch (\Exception $e) {
             Log::error('SMS sending failed', ['error' => $e->getMessage()]);
-            return false;
+            return new SmsSendResult(false, null, null, $e->getMessage());
         }
     }
 }

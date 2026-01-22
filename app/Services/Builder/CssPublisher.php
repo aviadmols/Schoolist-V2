@@ -4,6 +4,7 @@ namespace App\Services\Builder;
 
 use App\Models\ThemeCss;
 use App\Models\ThemeCssVersion;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 class CssPublisher
@@ -16,6 +17,14 @@ class CssPublisher
      */
     public function getThemeCss(): ThemeCss
     {
+        if (!Schema::hasTable('theme_css')) {
+            return new ThemeCss([
+                'draft_css' => '',
+                'published_css' => null,
+                'is_enabled' => false,
+            ]);
+        }
+
         $themeCss = ThemeCss::query()->first();
 
         if ($themeCss) {
@@ -96,6 +105,10 @@ class CssPublisher
      */
     public function getPublishedCssUrl(): ?string
     {
+        if (!Schema::hasTable('theme_css')) {
+            return null;
+        }
+
         $themeCss = ThemeCss::query()->first();
 
         if (!$themeCss || !$themeCss->is_enabled || !$themeCss->published_css) {
