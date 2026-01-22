@@ -13,7 +13,7 @@ class ListSmsSettings extends ListRecords
     /**
      * Ensure a default SMS settings row exists.
      */
-    protected function mount(): void
+    public function mount(): void
     {
         parent::mount();
 
