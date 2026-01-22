@@ -348,7 +348,7 @@ class ClassroomResource extends Resource
 
         $creator = $record->creator ?? null;
         if (!$creator) {
-            return 'Unknown';
+            return 'ADMIN';
         }
 
         if ($creator->role === 'site_admin') {
