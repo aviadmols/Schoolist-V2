@@ -70,9 +70,8 @@ class BuilderTemplateResource extends Resource
                     return new HtmlString($html);
                 })
                 ->columnSpanFull(),
-            Forms\Components\CodeEditor::make('draft_html')
+            Forms\Components\Textarea::make('draft_html')
                 ->label('Draft HTML')
-                ->language('html')
                 ->rows(20)
                 ->columnSpanFull(),
             Forms\Components\Textarea::make('mock_data_json')

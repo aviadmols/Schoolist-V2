@@ -7,6 +7,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ThemeCss extends Model
 {
+    /** @var string */
+    protected $table = 'theme_css';
+
     /** @var array<int, string> */
     protected $fillable = [
         'draft_css',

@@ -4,8 +4,8 @@ namespace App\Filament\Pages;
 
 use App\Models\ThemeCssVersion;
 use App\Services\Builder\CssPublisher;
-use Filament\Forms\Components\CodeEditor;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -54,9 +54,8 @@ class ThemeCssPage extends Page
                     }),
                 Toggle::make('is_enabled')
                     ->label('Enable Global CSS'),
-                CodeEditor::make('draft_css')
+                Textarea::make('draft_css')
                     ->label('Draft CSS')
-                    ->language('css')
                     ->rows(18)
                     ->columnSpanFull(),
                 Placeholder::make('published_url')
