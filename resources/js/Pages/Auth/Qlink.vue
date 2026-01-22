@@ -74,6 +74,17 @@ const submitLabel = computed(() => {
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
 /**
+ * Read a cookie by name.
+ *
+ * @param {string} name
+ * @returns {string|null}
+ */
+function readCookie(name) {
+  const match = document.cookie.match(new RegExp(`(^|;\\s*)${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
+/**
  * Post JSON to the backend.
  *
  * @param {string} url
@@ -81,11 +92,15 @@ const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribut
  * @returns {Promise<object>}
  */
 async function postJson(url, payload) {
+  const xsrfToken = readCookie('XSRF-TOKEN');
   const response = await fetch(url, {
     method: 'POST',
+    credentials: 'same-origin',
     headers: {
+      Accept: 'application/json',
       'Content-Type': 'application/json',
       'X-CSRF-TOKEN': csrfToken || '',
+      'X-XSRF-TOKEN': xsrfToken || '',
       'X-Requested-With': 'XMLHttpRequest',
     },
     body: JSON.stringify(payload),

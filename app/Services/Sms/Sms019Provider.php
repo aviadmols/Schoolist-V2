@@ -31,26 +31,41 @@ class Sms019Provider implements SmsProviderInterface
      */
     public function send(string $phone, string $message): bool
     {
-        // 019 API implementation details would go here.
-        // For now, we simulate the XML/JSON request.
-        
-        try {
-            // Note: Never log the message if it contains OTP in a real log.
-            // But here we just return success for the structure.
-            
-            // Example 019 XML request (pseudo-code)
-            /*
-            $response = Http::post('https://019sms.co.il/api/send_sms.php', [
-                'username' => $this->username,
-                'password' => $this->password,
-                'sender' => $this->sender,
+        if (!$this->username || !$this->password || !$this->sender) {
+            Log::error('SMS019 settings are incomplete. Cannot send SMS.');
+            return false;
+        }
+
+        $payload = [
+            'sms' => [
+                'user' => [
+                    'username' => $this->username,
+                ],
+                'source' => $this->sender,
+                'destinations' => [
+                    'phone' => [
+                        [
+                            '_' => ltrim($phone, '0'),
+                        ],
+                    ],
+                ],
+                'tag' => '#',
                 'message' => $message,
-                'phone' => $phone,
-            ]);
+                'add_dynamic' => '0',
+                'add_unsubscribe' => '0',
+                'includes_international' => '1',
+            ],
+        ];
+
+        try {
+            $authorization = base64_encode($this->username . ':' . $this->password);
+
+            $response = Http::withHeaders([
+                'Authorization' => 'Basic ' . $authorization,
+                'Content-Type' => 'application/json',
+            ])->post('https://019sms.co.il/api', $payload);
+
             return $response->successful();
-            */
-            
-            return true;
         } catch (\Exception $e) {
             Log::error('SMS sending failed', ['error' => $e->getMessage()]);
             return false;
