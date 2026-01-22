@@ -18,12 +18,11 @@ class ListSmsSettings extends ListRecords
         parent::mount();
 
         if (!SmsSetting::where('provider', 'sms019')->exists()) {
-            SmsSetting::create([
+            $setting = SmsSetting::create([
                 'provider' => 'sms019',
-                'username' => null,
-                'password' => null,
-                'sender' => null,
             ]);
+
+            $this->redirect(SmsSettingResource::getUrl('edit', ['record' => $setting]));
         }
     }
 }
