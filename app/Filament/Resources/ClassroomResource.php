@@ -26,6 +26,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\TimePicker;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
 
 class ClassroomResource extends Resource
@@ -108,6 +109,7 @@ class ClassroomResource extends Resource
                                 Repeater::make('importantContacts')
                                     ->relationship()
                                     ->schema([
+                                        static::createdByPlaceholder(),
                                         TextInput::make('first_name')->label('First Name')->required(),
                                         TextInput::make('last_name')->label('Last Name')->required(),
                                         TextInput::make('role')->label('Role')->required(),
@@ -125,12 +127,14 @@ class ClassroomResource extends Resource
                                 Repeater::make('children')
                                     ->relationship()
                                     ->schema([
+                                        static::createdByPlaceholder(),
                                         TextInput::make('name')
                                             ->label('Child Name')
                                             ->required(),
                                         Repeater::make('contacts')
                                             ->relationship()
                                             ->schema([
+                                                static::createdByPlaceholder(),
                                                 TextInput::make('name')
                                                     ->label('Contact Name')
                                                     ->required(),
@@ -161,6 +165,7 @@ class ClassroomResource extends Resource
                                 Repeater::make('links')
                                     ->relationship()
                                     ->schema([
+                                        static::createdByPlaceholder(),
                                         TextInput::make('title')->label('Title')->required(),
                                         TextInput::make('url')
                                             ->label('URL')
@@ -188,6 +193,7 @@ class ClassroomResource extends Resource
                                 Repeater::make('holidays')
                                     ->relationship()
                                     ->schema([
+                                        static::createdByPlaceholder(),
                                         TextInput::make('name')->label('Holiday Name')->required(),
                                         DatePicker::make('start_date')->label('Start Date')->required(),
                                         DatePicker::make('end_date')->label('End Date')->required(),
@@ -203,6 +209,7 @@ class ClassroomResource extends Resource
                                 Repeater::make('announcements')
                                     ->relationship()
                                     ->schema([
+                                        static::createdByPlaceholder(),
                                         Select::make('type')
                                             ->label('Post Type')
                                             ->options([
@@ -266,6 +273,7 @@ class ClassroomResource extends Resource
                     Repeater::make($relationship)
                         ->relationship()
                         ->schema([
+                            static::createdByPlaceholder(),
                             TextInput::make('subject')->label('Lesson Name')->required(),
                             TextInput::make('teacher')->label('Teacher (Optional)'),
                             TextInput::make('special_message')->label('Special Message'),
@@ -315,5 +323,43 @@ class ClassroomResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()->with(['city', 'school']);
+    }
+
+    /**
+     * Build a creator placeholder for repeater items.
+     */
+    protected static function createdByPlaceholder(): Placeholder
+    {
+        return Placeholder::make('creator_label')
+            ->label('Created By')
+            ->content(fn (?Model $record): string => static::formatCreatorLabel($record))
+            ->visible(fn (?Model $record): bool => (bool) $record)
+            ->columnSpanFull();
+    }
+
+    /**
+     * Resolve a creator label for a record.
+     */
+    protected static function formatCreatorLabel(?Model $record): string
+    {
+        if (!$record) {
+            return 'Unknown';
+        }
+
+        $creator = $record->creator ?? null;
+        if (!$creator) {
+            return 'Unknown';
+        }
+
+        if ($creator->role === 'site_admin') {
+            return 'ADMIN';
+        }
+
+        $name = trim(($creator->first_name ?? '') . ' ' . ($creator->last_name ?? ''));
+        if ($name !== '') {
+            return $name;
+        }
+
+        return $creator->name ?: ($creator->phone ?: 'User');
     }
 }
