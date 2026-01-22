@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Jobs\SendOtpSmsJob;
 use App\Models\AuthToken;
 use App\Models\OtpCode;
-use App\Models\Qlink;
 use App\Models\User;
 use App\Services\Auth\OtpService;
 use App\Services\Classroom\ClassroomContextService;
@@ -33,11 +32,11 @@ class QlinkController extends Controller
      */
     public function show(string $token): Response
     {
-        $qlink = $this->getActiveQlink($token);
+        $isValid = $this->isValidToken($token);
 
         return Inertia::render('Auth/Qlink', [
             'token' => $token,
-            'is_valid' => $qlink !== null,
+            'is_valid' => $isValid,
         ]);
     }
 
@@ -51,7 +50,7 @@ class QlinkController extends Controller
             'qlink_token' => ['required', 'string'],
         ]);
 
-        $this->assertActiveQlink($request->qlink_token);
+        $this->assertValidToken($request->qlink_token);
 
         $code = $otpService->generate($request->phone);
         SendOtpSmsJob::dispatch($request->phone, $code);
@@ -62,7 +61,7 @@ class QlinkController extends Controller
     /**
      * Verify OTP code for a phone and return next step.
      */
-    public function verifyOtp(Request $request, OtpService $otpService): JsonResponse
+    public function verifyOtp(Request $request, OtpService $otpService, ClassroomContextService $contextService): JsonResponse
     {
         $request->validate([
             'phone' => ['required', 'string', 'regex:/^[0-9]{10}$/'],
@@ -70,7 +69,7 @@ class QlinkController extends Controller
             'qlink_token' => ['required', 'string'],
         ]);
 
-        $this->assertActiveQlink($request->qlink_token);
+        $this->assertValidToken($request->qlink_token);
 
         if (!$otpService->verify($request->phone, $request->code)) {
             return response()->json(['message' => 'הקוד שגוי או שפג תוקפו.'], 422);
@@ -86,31 +85,54 @@ class QlinkController extends Controller
             ]);
         }
 
+        Auth::login($user);
+
+        $redirectUrl = route('profile.show');
+        $classroomId = null;
+
+        if ($user->current_classroom_id) {
+            $classroom = $user->classrooms()->where('classroom_id', $user->current_classroom_id)->first();
+            if ($classroom) {
+                $contextService->setCurrentClassroom($classroom);
+                $redirectUrl = route('classroom.show', $classroom);
+                $classroomId = $classroom->id;
+            }
+        }
+
+        $plainToken = Str::random(64);
+        AuthToken::create([
+            'user_id' => $user->id,
+            'classroom_id' => $classroomId,
+            'token_hash' => hash('sha256', $plainToken),
+            'expires_at' => Carbon::now()->addDays(self::TOKEN_EXPIRES_DAYS),
+        ]);
+
         return response()->json([
-            'requires_join' => true,
-            'phone' => $request->phone,
+            'auth_token' => $plainToken,
+            'redirect_url' => $redirectUrl,
         ]);
     }
 
     /**
      * Register a new user after OTP verification.
      */
-    public function register(Request $request): JsonResponse
+    public function register(Request $request, ClassroomService $classroomService, ClassroomContextService $contextService): JsonResponse
     {
         $request->validate([
             'phone' => ['required', 'string', 'regex:/^[0-9]{10}$/'],
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'unique:users,email'],
+            'join_code' => ['nullable', 'string', 'size:10'],
             'qlink_token' => ['required', 'string'],
         ]);
 
-        $this->assertActiveQlink($request->qlink_token);
+        $this->assertValidToken($request->qlink_token);
         $this->assertRecentOtpVerification($request->phone);
 
         $name = trim($request->first_name . ' ' . $request->last_name);
 
-        User::create([
+        $user = User::create([
             'phone' => $request->phone,
             'name' => $name,
             'first_name' => $request->first_name,
@@ -119,7 +141,32 @@ class QlinkController extends Controller
             'role' => 'user',
         ]);
 
-        return response()->json(['requires_join' => true]);
+        $classroom = null;
+        if ($request->join_code) {
+            $classroom = $classroomService->joinWithCode($user, $request->join_code);
+            if (!$classroom) {
+                return response()->json(['message' => 'קוד הכיתה שגוי.'], 422);
+            }
+        }
+
+        Auth::login($user);
+
+        $plainToken = Str::random(64);
+        AuthToken::create([
+            'user_id' => $user->id,
+            'classroom_id' => $classroom?->id,
+            'token_hash' => hash('sha256', $plainToken),
+            'expires_at' => Carbon::now()->addDays(self::TOKEN_EXPIRES_DAYS),
+        ]);
+
+        if ($classroom) {
+            $contextService->setCurrentClassroom($classroom);
+        }
+
+        return response()->json([
+            'auth_token' => $plainToken,
+            'redirect_url' => $classroom ? route('classroom.show', $classroom) : route('profile.show'),
+        ]);
     }
 
     /**
@@ -133,7 +180,7 @@ class QlinkController extends Controller
             'qlink_token' => ['required', 'string'],
         ]);
 
-        $this->assertActiveQlink($request->qlink_token);
+        $this->assertValidToken($request->qlink_token);
         $this->assertRecentOtpVerification($request->phone);
 
         $user = User::where('phone', $request->phone)->firstOrFail();
@@ -193,27 +240,23 @@ class QlinkController extends Controller
             }
         }
 
-        return response()->json(['redirect_url' => route('landing')]);
+        return response()->json(['redirect_url' => route('profile.show')]);
     }
 
     /**
      * Get an active qlink by token.
      */
-    private function getActiveQlink(string $token): ?Qlink
+    private function isValidToken(string $token): bool
     {
-        if (!preg_match('/^[0-9]{' . self::TOKEN_LENGTH . '}$/', $token)) {
-            return null;
-        }
-
-        return Qlink::where('token', $token)->where('is_active', true)->first();
+        return (bool) preg_match('/^[0-9]{' . self::TOKEN_LENGTH . '}$/', $token);
     }
 
     /**
      * Ensure the qlink token is active.
      */
-    private function assertActiveQlink(string $token): void
+    private function assertValidToken(string $token): void
     {
-        if (!$this->getActiveQlink($token)) {
+        if (!$this->isValidToken($token)) {
             abort(404);
         }
     }

@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\GetLoginPageController;
+use App\Http\Controllers\Auth\GetProfilePageController;
 use App\Http\Controllers\Auth\GetOtpLoginPageController;
 use App\Http\Controllers\Auth\QlinkController;
 use App\Http\Controllers\Public\GetLandingPageController;
@@ -64,6 +65,7 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
 })->name('classroom.show');
 
 Route::middleware('auth')->group(function () {
+    Route::get('/me', GetProfilePageController::class)->name('profile.show');
     Route::get('/dashboard', \App\Http\Controllers\Classroom\DashboardController::class)
         ->middleware('classroom.context')
         ->name('dashboard');

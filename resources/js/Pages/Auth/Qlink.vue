@@ -26,11 +26,10 @@
         <UiField label="אימייל (לא חובה)">
           <UiInput v-model="email" type="email" />
         </UiField>
+        <UiField label="קוד כיתה (לא חובה)">
+          <UiInput v-model="joinCode" type="text" placeholder="1234567890" />
+        </UiField>
       </div>
-
-      <UiField v-if="step === 'join'" label="קוד כיתה">
-        <UiInput v-model="joinCode" type="text" placeholder="1234567890" />
-      </UiField>
 
       <UiButton type="submit" variant="primary" :disabled="isSubmitting">
         {{ submitLabel }}
@@ -69,8 +68,7 @@ const isSubmitting = ref(false);
 const submitLabel = computed(() => {
   if (step.value === 'phone') return 'שלח קוד אימות';
   if (step.value === 'code') return 'אימות קוד';
-  if (step.value === 'register') return 'המשך';
-  return 'הצטרף לכיתה';
+  return 'המשך';
 });
 
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
@@ -155,34 +153,32 @@ async function handleSubmit() {
         step.value = 'register';
         return;
       }
-      step.value = 'join';
+      if (data.auth_token) {
+        window.localStorage.setItem('schoolist_qtoken', data.auth_token);
+      }
+      if (data.redirect_url) {
+        window.location.href = data.redirect_url;
+      }
       return;
     }
 
-    if (step.value === 'register') {
-      await postJson('/qlink/register', {
+  if (step.value === 'register') {
+      const data = await postJson('/qlink/register', {
         phone: phone.value,
         first_name: firstName.value,
         last_name: lastName.value,
         email: email.value || null,
+      join_code: joinCode.value || null,
         qlink_token: props.token,
       });
-      step.value = 'join';
+      if (data.auth_token) {
+        window.localStorage.setItem('schoolist_qtoken', data.auth_token);
+      }
+      if (data.redirect_url) {
+        window.location.href = data.redirect_url;
+      }
       return;
-    }
-
-    const data = await postJson('/qlink/join', {
-      phone: phone.value,
-      join_code: joinCode.value,
-      qlink_token: props.token,
-    });
-
-    if (data.auth_token) {
-      window.localStorage.setItem('schoolist_qtoken', data.auth_token);
-    }
-    if (data.redirect_url) {
-      window.location.href = data.redirect_url;
-    }
+  }
   } catch (err) {
     error.value = err?.message || 'שגיאה לא צפויה.';
   } finally {
