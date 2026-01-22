@@ -5,7 +5,9 @@ use App\Http\Controllers\Auth\GetLoginPageController;
 use App\Http\Controllers\Auth\GetProfilePageController;
 use App\Http\Controllers\Auth\GetOtpLoginPageController;
 use App\Http\Controllers\Auth\QlinkController;
+use App\Http\Controllers\Admin\Builder\TemplatePreviewController;
 use App\Http\Controllers\Public\GetLandingPageController;
+use App\Services\Builder\TemplateRenderer;
 
 Route::get('/', GetLandingPageController::class)->name('landing');
 
@@ -48,7 +50,7 @@ Route::post('/qlink/auto', [QlinkController::class, 'autoLogin'])->name('qlink.a
 
 Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
     $classroom->load(['city', 'school']);
-    return \Inertia\Inertia::render('Dashboard', [
+    $pageData = [
         'classroom' => [
             'id' => $classroom->id,
             'name' => $classroom->name,
@@ -58,10 +60,25 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
             'school_name' => $classroom->school?->name,
         ],
         'selected_day' => (int) now()->dayOfWeek,
-        'timetable' => [], // Add dummy or load real if needed
+        'timetable' => [],
         'announcements' => [],
         'timetable_image' => null,
+    ];
+
+    $overrideHtml = app(TemplateRenderer::class)->renderPublishedByKey('classroom.page', [
+        'user' => auth()->user(),
+        'classroom' => $classroom,
+        'locale' => app()->getLocale(),
+        'page' => $pageData,
     ]);
+
+    if ($overrideHtml) {
+        return response()->view('builder.screen', [
+            'html' => $overrideHtml,
+        ]);
+    }
+
+    return \Inertia\Inertia::render('Dashboard', $pageData);
 })->name('classroom.show');
 
 Route::middleware('auth')->group(function () {
@@ -138,3 +155,10 @@ Route::middleware('auth')->group(function () {
 
 // Public Link redirection
 Route::get('/link/{token}', [\App\Http\Controllers\Classroom\LinkClaimController::class, 'show'])->name('link.show');
+
+Route::middleware(['auth', 'can:manage_screen_builder'])
+    ->prefix('admin/screen-builder')
+    ->group(function () {
+        Route::get('/preview/{template}', TemplatePreviewController::class)
+            ->name('builder.preview');
+    });

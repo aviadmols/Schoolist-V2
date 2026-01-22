@@ -11,6 +11,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        require_once app_path('Support/helpers.php');
+
         $this->app->bind(
             \App\Services\Sms\SmsProviderInterface::class,
             \App\Services\Sms\Sms019Provider::class
@@ -25,6 +27,18 @@ class AppServiceProvider extends ServiceProvider
         if ($this->app->environment('production')) {
             \Illuminate\Support\Facades\URL::forceScheme('https');
         }
+
+        \Illuminate\Support\Facades\Gate::define('manage_screen_builder', function (\App\Models\User $user) {
+            return $user->role === 'site_admin';
+        });
+
+        \Illuminate\Support\Facades\Gate::define('manage_theme_css', function (\App\Models\User $user) {
+            return $user->role === 'site_admin';
+        });
+
+        \Illuminate\Support\Facades\Gate::define('manage_media', function (\App\Models\User $user) {
+            return $user->role === 'site_admin';
+        });
 
         \Illuminate\Support\Facades\RateLimiter::for('otp', function (\Illuminate\Http\Request $request) {
             return [
