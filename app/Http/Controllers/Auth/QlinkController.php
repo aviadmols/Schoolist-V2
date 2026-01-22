@@ -289,7 +289,7 @@ class QlinkController extends Controller
 
         return Qlink::firstOrCreate(
             ['token' => $token],
-            ['is_active' => true]
+            ['is_active' => false]
         );
     }
 
@@ -302,7 +302,10 @@ class QlinkController extends Controller
             return;
         }
 
-        Qlink::where('token', $token)->update(['classroom_id' => $classroomId]);
+        Qlink::where('token', $token)->update([
+            'classroom_id' => $classroomId,
+            'is_active' => true,
+        ]);
     }
 
     /**

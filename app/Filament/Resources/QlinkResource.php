@@ -57,7 +57,10 @@ class QlinkResource extends Resource
                     ->label('Open Link')
                     ->state(fn (Qlink $record): string => url('/qlink/' . $record->token))
                     ->url(fn (Qlink $record): string => url('/qlink/' . $record->token), true),
-                Tables\Columns\IconColumn::make('is_active')->label('Active')->boolean(),
+                Tables\Columns\IconColumn::make('is_active')
+                    ->label('Active')
+                    ->boolean()
+                    ->getStateUsing(fn (Qlink $record): bool => (bool) $record->classroom_id),
                 Tables\Columns\TextColumn::make('created_at')->label('Created')->dateTime(),
             ])
             ->actions([
