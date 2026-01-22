@@ -12,6 +12,7 @@ class SmsSetting extends Model
         'username',
         'password',
         'sender',
+        'otp_message_template',
     ];
 
     /** @var array<string, string> */

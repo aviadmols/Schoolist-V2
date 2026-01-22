@@ -39,6 +39,10 @@ class SmsSettingResource extends Resource
             Forms\Components\TextInput::make('sender')
                 ->label('Sender')
                 ->maxLength(255),
+            Forms\Components\Textarea::make('otp_message_template')
+                ->label('OTP Message Template')
+                ->helperText('Use {{code}} for the OTP code.')
+                ->rows(3),
         ]);
     }
 

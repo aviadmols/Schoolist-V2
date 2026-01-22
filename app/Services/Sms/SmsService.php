@@ -3,6 +3,7 @@
 namespace App\Services\Sms;
 
 use App\Models\SmsLog;
+use App\Models\SmsSetting;
 use Illuminate\Support\Facades\Request;
 
 class SmsService
@@ -33,6 +34,17 @@ class SmsService
         ]);
 
         return $success;
+    }
+
+    /**
+     * Build the OTP message from settings.
+     */
+    public function buildOtpMessage(string $code): string
+    {
+        $setting = SmsSetting::where('provider', 'sms019')->first();
+        $template = $setting?->otp_message_template ?: 'קוד האימות שלך הוא: {{code}}';
+
+        return str_replace('{{code}}', $code, $template);
     }
 
     /**
