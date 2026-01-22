@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Jobs\SendOtpSmsJob;
+use App\Models\SmsLog;
 use App\Services\Auth\OtpService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -29,6 +30,16 @@ class RequestOtpController
         ]);
 
         $code = $otpService->generate($phone);
+
+        SmsLog::create([
+            'provider' => 'sms019',
+            'phone_mask' => substr($phone, 0, 3) . '****' . substr($phone, -3),
+            'status' => 'queued',
+            'request_id' => $request->header('X-Request-Id'),
+            'user_id' => auth()->id(),
+            'classroom_id' => $request->attributes->get('current_classroom')?->id,
+            'error_message' => null,
+        ]);
 
         // Dispatch job to send SMS
         SendOtpSmsJob::dispatch($phone, $code);

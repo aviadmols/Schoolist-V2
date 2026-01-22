@@ -7,6 +7,7 @@ use App\Models\SmsLog;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class SmsLogResource extends Resource
 {
@@ -29,10 +30,12 @@ class SmsLogResource extends Resource
                 Tables\Columns\TextColumn::make('user.name')->label('User'),
                 Tables\Columns\TextColumn::make('classroom_id')->label('Classroom'),
                 Tables\Columns\TextColumn::make('request_id')->label('Request ID'),
+                Tables\Columns\TextColumn::make('error_message')->label('Error'),
                 Tables\Columns\TextColumn::make('created_at')->label('Created')->dateTime(),
             ])
             ->actions([])
-            ->bulkActions([]);
+            ->bulkActions([])
+            ->defaultSort('created_at', 'desc');
     }
 
     /**
@@ -41,6 +44,15 @@ class SmsLogResource extends Resource
     public static function canCreate(): bool
     {
         return false;
+    }
+
+    /**
+     * Limit logs to the last 24 hours.
+     */
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->where('created_at', '>=', now()->subDay());
     }
 
     /**
