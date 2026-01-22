@@ -31,7 +31,7 @@ class RequestOtpController
 
         $code = $otpService->generate($phone);
 
-        SmsLog::create([
+        $log = SmsLog::create([
             'provider' => 'sms019',
             'phone_mask' => substr($phone, 0, 3) . '****' . substr($phone, -3),
             'status' => 'queued',
@@ -42,7 +42,7 @@ class RequestOtpController
         ]);
 
         // Dispatch job to send SMS
-        SendOtpSmsJob::dispatch($phone, $code);
+        SendOtpSmsJob::dispatch($phone, $code, $log->id);
 
         return response()->json([
             'message' => 'הקוד נשלח בהצלחה.',

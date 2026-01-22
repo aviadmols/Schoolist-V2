@@ -42,6 +42,34 @@ class SmsService
     }
 
     /**
+     * Send an SMS and update an existing log.
+     */
+    public function sendWithLog(SmsLog $log, string $phone, string $message): bool
+    {
+        $log->update([
+            'status' => 'attempt',
+            'error_message' => null,
+        ]);
+
+        try {
+            $success = $this->provider->send($phone, $message);
+        } catch (\Exception $exception) {
+            $log->update([
+                'status' => 'failed',
+                'error_message' => $exception->getMessage(),
+            ]);
+            return false;
+        }
+
+        $log->update([
+            'status' => $success ? 'sent' : 'failed',
+            'error_message' => $success ? null : 'Provider returned failure',
+        ]);
+
+        return $success;
+    }
+
+    /**
      * Build the OTP message from settings.
      */
     public function buildOtpMessage(string $code): string

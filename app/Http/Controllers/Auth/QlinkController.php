@@ -68,7 +68,7 @@ class QlinkController extends Controller
 
         $code = $otpService->generate($request->phone);
 
-        SmsLog::create([
+        $log = SmsLog::create([
             'provider' => 'sms019',
             'phone_mask' => substr($request->phone, 0, 3) . '****' . substr($request->phone, -3),
             'status' => 'queued',
@@ -78,7 +78,7 @@ class QlinkController extends Controller
             'error_message' => null,
         ]);
 
-        SendOtpSmsJob::dispatch($request->phone, $code);
+        SendOtpSmsJob::dispatch($request->phone, $code, $log->id);
 
         return response()->json(['message' => 'הקוד נשלח בהצלחה.']);
     }

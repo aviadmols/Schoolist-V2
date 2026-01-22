@@ -2,7 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Models\SmsLog;
 use App\Services\Sms\SmsService;
+use Throwable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -19,13 +21,17 @@ class SendOtpSmsJob implements ShouldQueue
     /** @var string */
     private string $code;
 
+    /** @var int|null */
+    private ?int $smsLogId;
+
     /**
      * Create a new job instance.
      */
-    public function __construct(string $phone, string $code)
+    public function __construct(string $phone, string $code, ?int $smsLogId = null)
     {
         $this->phone = $phone;
         $this->code = $code;
+        $this->smsLogId = $smsLogId;
     }
 
     /**
@@ -34,6 +40,33 @@ class SendOtpSmsJob implements ShouldQueue
     public function handle(SmsService $smsService): void
     {
         $message = $smsService->buildOtpMessage($this->code);
+        $log = $this->smsLogId ? SmsLog::find($this->smsLogId) : null;
+
+        if ($log) {
+            $smsService->sendWithLog($log, $this->phone, $message);
+            return;
+        }
+
         $smsService->send($this->phone, $message);
+    }
+
+    /**
+     * Handle a job failure.
+     */
+    public function failed(Throwable $exception): void
+    {
+        if (!$this->smsLogId) {
+            return;
+        }
+
+        $log = SmsLog::find($this->smsLogId);
+        if (!$log) {
+            return;
+        }
+
+        $log->update([
+            'status' => 'failed',
+            'error_message' => $exception->getMessage(),
+        ]);
     }
 }
