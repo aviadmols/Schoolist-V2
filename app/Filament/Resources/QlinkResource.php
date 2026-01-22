@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\QlinkResource\Pages;
+use App\Filament\Resources\QlinkResource\RelationManagers;
 use App\Models\Qlink;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -10,6 +11,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Builder;
 
 class QlinkResource extends Resource
 {
@@ -46,6 +48,15 @@ class QlinkResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('token')->label('Token'),
+                Tables\Columns\TextColumn::make('classroom.name')->label('Classroom'),
+                Tables\Columns\TextColumn::make('visits_count')->label('Visits')->counts('visits'),
+                Tables\Columns\TextColumn::make('visits_max_created_at')
+                    ->label('Last Visit')
+                    ->dateTime(),
+                Tables\Columns\TextColumn::make('public_url')
+                    ->label('Open Link')
+                    ->state(fn (Qlink $record): string => url('/qlink/' . $record->token))
+                    ->url(fn (Qlink $record): string => url('/qlink/' . $record->token), true),
                 Tables\Columns\IconColumn::make('is_active')->label('Active')->boolean(),
                 Tables\Columns\TextColumn::make('created_at')->label('Created')->dateTime(),
             ])
@@ -94,5 +105,26 @@ class QlinkResource extends Resource
             'create' => Pages\CreateQlink::route('/create'),
             'edit' => Pages\EditQlink::route('/{record}/edit'),
         ];
+    }
+
+    /**
+     * Define the relation managers for qlinks.
+     */
+    public static function getRelations(): array
+    {
+        return [
+            RelationManagers\QlinkVisitsRelationManager::class,
+        ];
+    }
+
+    /**
+     * Optimize the table query.
+     */
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->with(['classroom'])
+            ->withCount('visits')
+            ->withMax('visits', 'created_at');
     }
 }

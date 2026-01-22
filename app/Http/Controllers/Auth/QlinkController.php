@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Jobs\SendOtpSmsJob;
 use App\Models\AuthToken;
 use App\Models\OtpCode;
+use App\Models\Qlink;
+use App\Models\QlinkVisit;
 use App\Models\User;
 use App\Services\Auth\OtpService;
 use App\Services\Classroom\ClassroomContextService;
@@ -33,6 +35,17 @@ class QlinkController extends Controller
     public function show(string $token): Response
     {
         $isValid = $this->isValidToken($token);
+        $qlink = $this->getOrCreateQlink($token);
+
+        if ($qlink) {
+            QlinkVisit::create([
+                'qlink_id' => $qlink->id,
+                'user_id' => auth()->id(),
+                'request_id' => request()->header('X-Request-Id'),
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ]);
+        }
 
         return Inertia::render('Auth/Qlink', [
             'token' => $token,
@@ -149,6 +162,8 @@ class QlinkController extends Controller
             }
         }
 
+        $this->attachQlinkToClassroom($request->qlink_token, $classroom?->id);
+
         Auth::login($user);
 
         $plainToken = Str::random(64);
@@ -189,6 +204,8 @@ class QlinkController extends Controller
         if (!$classroom) {
             return response()->json(['message' => 'קוד הכיתה שגוי.'], 422);
         }
+
+        $this->attachQlinkToClassroom($request->qlink_token, $classroom->id);
 
         Auth::login($user);
         $contextService->setCurrentClassroom($classroom);
@@ -259,6 +276,33 @@ class QlinkController extends Controller
         if (!$this->isValidToken($token)) {
             abort(404);
         }
+    }
+
+    /**
+     * Create or fetch a qlink row for a valid token.
+     */
+    private function getOrCreateQlink(string $token): ?Qlink
+    {
+        if (!$this->isValidToken($token)) {
+            return null;
+        }
+
+        return Qlink::firstOrCreate(
+            ['token' => $token],
+            ['is_active' => true]
+        );
+    }
+
+    /**
+     * Attach the qlink to a classroom if provided.
+     */
+    private function attachQlinkToClassroom(string $token, ?int $classroomId): void
+    {
+        if (!$classroomId) {
+            return;
+        }
+
+        Qlink::where('token', $token)->update(['classroom_id' => $classroomId]);
     }
 
     /**

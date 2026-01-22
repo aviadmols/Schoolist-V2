@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Qlink extends Model
 {
@@ -12,6 +13,7 @@ class Qlink extends Model
         'token',
         'is_active',
         'created_by_user_id',
+        'classroom_id',
     ];
 
     /** @var array<string, string> */
@@ -25,5 +27,21 @@ class Qlink extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_user_id');
+    }
+
+    /**
+     * The classroom linked to this qlink.
+     */
+    public function classroom(): BelongsTo
+    {
+        return $this->belongsTo(Classroom::class);
+    }
+
+    /**
+     * Visits for this qlink.
+     */
+    public function visits(): HasMany
+    {
+        return $this->hasMany(QlinkVisit::class);
     }
 }
