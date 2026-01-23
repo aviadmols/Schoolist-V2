@@ -199,7 +199,7 @@ class TemplateManager
      */
     private function getDefaultClassroomPageHtml(): string
     {
-        return <<<HTML
+        return <<<'HTML'
 <style>
   .sb-page { background: #0b0b0b; padding: 32px 0 64px; font-family: "Inter", Arial, sans-serif; }
   .sb-container { max-width: 420px; margin: 0 auto; padding: 0 16px; }
