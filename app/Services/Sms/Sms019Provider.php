@@ -45,16 +45,14 @@ class Sms019Provider implements SmsProviderInterface
                 'source' => $this->sender,
                 'destinations' => [
                     'phone' => [
-                        [
-                            '_' => ltrim($phone, '0'),
-                        ],
+                        ltrim($phone, '0'),
                     ],
                 ],
                 'tag' => '#',
                 'message' => $message,
                 'add_dynamic' => '0',
                 'add_unsubscribe' => '0',
-                'includes_international' => '1',
+                'includes_international' => '0',
             ],
         ];
 

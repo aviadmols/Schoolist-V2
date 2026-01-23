@@ -59,8 +59,7 @@ class SmsLogResource extends Resource
      */
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
-            ->where('created_at', '>=', now()->subDay());
+        return parent::getEloquentQuery();
     }
 
     /**

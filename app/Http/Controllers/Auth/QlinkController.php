@@ -9,6 +9,7 @@ use App\Models\OtpCode;
 use App\Models\Qlink;
 use App\Models\QlinkVisit;
 use App\Models\SmsLog;
+use App\Models\SmsSetting;
 use App\Models\User;
 use App\Services\Auth\OtpService;
 use App\Services\Classroom\ClassroomContextService;
@@ -67,6 +68,13 @@ class QlinkController extends Controller
         $this->assertValidToken($request->qlink_token);
 
         $code = $otpService->generate($request->phone);
+        $setting = SmsSetting::where('provider', 'sms019')->first();
+        $providerRequest = [
+            'sender' => $setting?->sender ?? (string) config('services.sms019.sender'),
+            'phone_mask' => substr($request->phone, 0, 3) . '****' . substr($request->phone, -3),
+            'message_length' => 0,
+        ];
+        $providerRequestJson = json_encode($providerRequest, JSON_UNESCAPED_SLASHES) ?: '';
 
         $log = SmsLog::create([
             'provider' => 'sms019',
@@ -76,6 +84,7 @@ class QlinkController extends Controller
             'user_id' => auth()->id(),
             'classroom_id' => $request->attributes->get('current_classroom')?->id,
             'error_message' => null,
+            'provider_request' => $providerRequestJson,
         ]);
 
         SendOtpSmsJob::dispatch($request->phone, $code, $log->id);
