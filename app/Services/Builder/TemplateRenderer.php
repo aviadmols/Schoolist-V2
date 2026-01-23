@@ -196,16 +196,75 @@ class TemplateRenderer
      */
     public function isTemplateSafe(string $html, ?string $css = null, ?string $js = null): bool
     {
+        $payload = $html.($css ? ' '.$css : '').($js ? ' '.$js : '');
+
+        if ($this->containsUnsafePhpBlock($payload)) {
+            return false;
+        }
+
         $patterns = [
             '/<\\?php/i',
             '/<\\?=\\s*/i',
-            '/@php\\b/i',
         ];
-
-        $payload = $html.($css ? ' '.$css : '').($js ? ' '.$js : '');
 
         foreach ($patterns as $pattern) {
             if (preg_match($pattern, $payload) === 1) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Validate @php blocks for safe assignments only.
+     */
+    private function containsUnsafePhpBlock(string $payload): bool
+    {
+        if (preg_match('/@php\\b/i', $payload) !== 1) {
+            return false;
+        }
+
+        if (preg_match_all('/@php\\b(.*?)@endphp/si', $payload, $matches) !== 1) {
+            return true;
+        }
+
+        foreach ($matches[1] as $block) {
+            if (!$this->isPhpBlockSafe($block)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Ensure a PHP block contains only simple assignments.
+     */
+    private function isPhpBlockSafe(string $block): bool
+    {
+        $code = trim($block);
+
+        if ($code === '') {
+            return false;
+        }
+
+        if (preg_match('/<\\?php|<\\?=|\\?>/i', $code) === 1) {
+            return false;
+        }
+
+        if (preg_match('/\\b(function|class|new|eval|include|require|include_once|require_once|shell_exec|exec|system|passthru|proc_open|popen|curl_exec|file_get_contents|file_put_contents|fopen|fwrite|unlink|chmod|chown|sleep|usleep)\\b/i', $code) === 1) {
+            return false;
+        }
+
+        if (preg_match('/\\b[a-zA-Z_][a-zA-Z0-9_]*\\s*\\(/', $code) === 1) {
+            return false;
+        }
+
+        $statements = array_filter(array_map('trim', explode(';', $code)));
+
+        foreach ($statements as $statement) {
+            if (!preg_match('/^\\$[A-Za-z_][A-Za-z0-9_]*\\s*=.+$/s', $statement)) {
                 return false;
             }
         }
