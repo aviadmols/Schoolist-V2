@@ -166,6 +166,8 @@ class SmsService
     private function formatOtpMessageForAutoFill(string $message): string
     {
         $trimmed = trim($message);
+        $trimmed = preg_replace('/^<#>\\s*/', '', $trimmed) ?? $trimmed;
+        $trimmed = preg_replace('/\\s*@[^\\s]+$/', '', $trimmed) ?? $trimmed;
         $prefix = '<#> ';
         $host = $this->getOtpSmsHost();
 
@@ -174,7 +176,7 @@ class SmsService
         }
 
         $suffix = "\n@".$host;
-        $withPrefix = str_starts_with($trimmed, '<#>') ? $trimmed : $prefix.$trimmed;
+        $withPrefix = $prefix.$trimmed;
 
         if (str_contains($withPrefix, '@'.$host)) {
             return $withPrefix;

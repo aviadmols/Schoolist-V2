@@ -13,7 +13,7 @@
       </UiField>
 
       <UiField v-if="step === 'code'" label="קוד אימות">
-        <UiInput v-model="code" type="text" placeholder="123456" />
+        <UiInput v-model="code" type="text" placeholder="123456" autocomplete="one-time-code" inputmode="numeric" maxlength="6" />
       </UiField>
 
       <div v-if="step === 'register'" class="stack">

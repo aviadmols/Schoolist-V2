@@ -5,6 +5,9 @@
     :value="modelValue"
     :placeholder="placeholder"
     :disabled="disabled"
+    :autocomplete="autocomplete"
+    :inputmode="inputmode"
+    :maxlength="maxlength"
     @input="onInput"
   />
 </template>
@@ -17,6 +20,9 @@ const props = defineProps({
   type: { type: String, default: 'text' },
   placeholder: { type: String, default: '' },
   disabled: { type: Boolean, default: false },
+  autocomplete: { type: String, default: '' },
+  inputmode: { type: String, default: '' },
+  maxlength: { type: [String, Number], default: undefined },
 });
 
 /**
