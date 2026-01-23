@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\BuilderTemplateResource\Pages;
+use App\Forms\Components\CodeEditor;
 use App\Models\BuilderTemplate;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -69,21 +70,21 @@ class BuilderTemplateResource extends Resource
                         ->columnSpan(1),
                     Section::make('HTML')
                         ->schema([
-                            Forms\Components\Textarea::make('draft_html')
+                            CodeEditor::make('draft_html')
                                 ->label('')
                                 ->rows(18),
                         ])
                         ->columnSpan(1),
                     Section::make('CSS')
                         ->schema([
-                            Forms\Components\Textarea::make('draft_css')
+                            CodeEditor::make('draft_css')
                                 ->label('')
                                 ->rows(18),
                         ])
                         ->columnSpan(1),
                     Section::make('JS')
                         ->schema([
-                            Forms\Components\Textarea::make('draft_js')
+                            CodeEditor::make('draft_js')
                                 ->label('')
                                 ->rows(18),
                         ])
