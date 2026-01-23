@@ -67,6 +67,22 @@ class SendOtpSmsJob implements ShouldQueue
         $log->update([
             'status' => 'failed',
             'error_message' => $exception->getMessage(),
+            'provider_response' => $this->buildFailureResponse($exception->getMessage()),
         ]);
+    }
+
+    /**
+     * Build a provider response payload for failures.
+     */
+    private function buildFailureResponse(string $message): string
+    {
+        $payload = [
+            'success' => false,
+            'status_code' => null,
+            'error' => $message,
+            'body' => null,
+        ];
+
+        return json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR) ?: '';
     }
 }

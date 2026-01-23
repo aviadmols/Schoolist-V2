@@ -45,7 +45,7 @@ class SmsService
 
         $log->update([
             'status' => $success ? 'sent' : 'failed',
-            'error_message' => $success ? null : ($result->getErrorMessage() ?: 'Provider returned failure'),
+            'error_message' => $success ? null : $this->resolveErrorMessage($result),
             'provider_response' => $this->formatProviderResponse($result),
         ]);
 
@@ -76,7 +76,7 @@ class SmsService
 
         $log->update([
             'status' => $success ? 'sent' : 'failed',
-            'error_message' => $success ? null : ($result->getErrorMessage() ?: 'Provider returned failure'),
+            'error_message' => $success ? null : $this->resolveErrorMessage($result),
             'provider_response' => $this->formatProviderResponse($result),
         ]);
 
@@ -118,7 +118,27 @@ class SmsService
             'body' => $this->truncateResponseBody($result->getResponseBody()),
         ];
 
-        return json_encode($payload, JSON_UNESCAPED_SLASHES) ?: '';
+        return json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR) ?: '';
+    }
+
+    /**
+     * Resolve an error message for a failed send.
+     */
+    private function resolveErrorMessage(SmsSendResult $result): string
+    {
+        $message = trim((string) $result->getErrorMessage());
+
+        if ($message !== '') {
+            return $message;
+        }
+
+        $statusCode = $result->getStatusCode();
+
+        if ($statusCode) {
+            return 'Provider returned failure (status '.$statusCode.').';
+        }
+
+        return 'Provider returned failure';
     }
 
     /**

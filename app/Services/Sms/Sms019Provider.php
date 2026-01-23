@@ -65,11 +65,13 @@ class Sms019Provider implements SmsProviderInterface
                 ->asJson()
                 ->post('https://019sms.co.il/api', $payload);
 
+            $errorMessage = $response->successful() ? null : 'Provider returned failure';
+
             return new SmsSendResult(
                 $response->successful(),
                 $response->status(),
                 $response->body(),
-                null
+                $errorMessage
             );
         } catch (\Exception $e) {
             Log::error('SMS sending failed', ['error' => $e->getMessage()]);
