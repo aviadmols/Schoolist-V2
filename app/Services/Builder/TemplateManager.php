@@ -170,7 +170,7 @@ class TemplateManager
             ]
         );
 
-        if (!$template->draft_html && $defaultHtml) {
+        if (($this->shouldSeedTemplate($template) || $this->shouldReplaceTemplateDraft($template, $key)) && $defaultHtml) {
             $template->update([
                 'draft_html' => $parts['html'],
                 'draft_css' => $parts['css'],
@@ -189,6 +189,10 @@ class TemplateManager
     {
         if ($key === 'classroom.page') {
             return $this->getDefaultClassroomPageHtml();
+        }
+
+        if ($key === 'auth.login') {
+            return $this->getDefaultLoginPageHtml();
         }
 
         return '';
@@ -352,12 +356,15 @@ HTML;
     private function getDefaultPopupHtml(string $title, string $key): string
     {
         $id = $this->getPopupIdFromKey($key);
+        $body = $this->getPopupBodyHtml($key);
 
         return <<<HTML
 <div id="{$id}" class="sb-modal">
   <div class="sb-modal-card">
     <div class="sb-modal-title">{$title}</div>
-    <div class="sb-modal-body">This is a sample popup template. Replace this content with your own.</div>
+    <div class="sb-modal-body">
+      {$body}
+    </div>
     <div class="sb-modal-actions">
       <a href="#" class="sb-button is-ghost">Close</a>
       <a href="#" class="sb-button">Done</a>
@@ -390,6 +397,177 @@ HTML;
         $shortKey = Str::after($key, $prefix);
 
         return 'popup-'.Str::slug($shortKey);
+    }
+
+    /**
+     * Determine if a template should be seeded with defaults.
+     */
+    private function shouldSeedTemplate(BuilderTemplate $template): bool
+    {
+        return !$template->draft_html && !$template->draft_css && !$template->draft_js;
+    }
+
+    /**
+     * Determine if a template should be refreshed with new defaults.
+     */
+    private function shouldReplaceTemplateDraft(BuilderTemplate $template, string $key): bool
+    {
+        $draftHtml = (string) ($template->draft_html ?? '');
+
+        if (str_contains($draftHtml, 'This is a sample popup template')) {
+            return true;
+        }
+
+        if ($key === 'auth.login' && $this->shouldSeedTemplate($template)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Build the default login HTML.
+     */
+    private function getDefaultLoginPageHtml(): string
+    {
+        return <<<'HTML'
+<style>
+  .sb-login-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px 16px; background: #f8fafc; font-family: "Inter", Arial, sans-serif; }
+  .sb-login-card { width: 100%; max-width: 420px; background: #ffffff; border-radius: 20px; padding: 28px; box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12); }
+  .sb-login-title { font-size: 20px; font-weight: 700; margin: 0 0 6px; color: #0f172a; }
+  .sb-login-subtitle { font-size: 13px; color: #64748b; margin-bottom: 18px; }
+  .sb-login-stack { display: grid; gap: 12px; }
+  .sb-login-field { display: grid; gap: 6px; font-size: 12px; color: #475569; }
+  .sb-login-input { width: 100%; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+  .sb-login-button { width: 100%; border: none; border-radius: 12px; background: #2563eb; color: #ffffff; padding: 12px; font-weight: 600; cursor: pointer; }
+  .sb-login-links { display: flex; justify-content: space-between; font-size: 12px; color: #64748b; margin-top: 10px; }
+  .sb-login-links a { color: inherit; text-decoration: none; }
+</style>
+<div class="sb-login-page">
+  <div class="sb-login-card">
+    <h1 class="sb-login-title">Welcome back</h1>
+    <p class="sb-login-subtitle">Sign in to manage your classroom updates.</p>
+    <form method="post" action="/login" class="sb-login-stack">
+      @csrf
+      <label class="sb-login-field">
+        Phone
+        <input type="text" name="phone" class="sb-login-input" placeholder="0500000000" autocomplete="tel">
+      </label>
+      <label class="sb-login-field">
+        Password
+        <input type="password" name="password" class="sb-login-input" placeholder="••••••••" autocomplete="current-password">
+      </label>
+      <button type="submit" class="sb-login-button">Sign in</button>
+    </form>
+    <div class="sb-login-links">
+      <a href="/auth/code">Use one-time code</a>
+      <a href="/">Back to site</a>
+    </div>
+  </div>
+</div>
+HTML;
+    }
+
+    /**
+     * Build popup body HTML by key.
+     */
+    private function getPopupBodyHtml(string $key): string
+    {
+        $shortKey = Str::after($key, (string) config('builder.popup_prefix'));
+
+        return match ($shortKey) {
+            'invite' => $this->getInvitePopupBodyHtml(),
+            'homework' => $this->getHomeworkPopupBodyHtml(),
+            'links' => $this->getLinksPopupBodyHtml(),
+            'contacts' => $this->getContactsPopupBodyHtml(),
+            'food' => $this->getFoodPopupBodyHtml(),
+            'schedule' => $this->getSchedulePopupBodyHtml(),
+            default => '<p>Add your content here.</p>',
+        };
+    }
+
+    /**
+     * Build invite popup body HTML.
+     */
+    private function getInvitePopupBodyHtml(): string
+    {
+        return <<<'HTML'
+<p>Share this invite link with parents to join the classroom.</p>
+<div class="sb-list">
+  <div class="sb-row"><span>Invite Link</span><span>classroom.link/ABCD</span></div>
+  <div class="sb-row"><span>Expires</span><span>30 days</span></div>
+</div>
+HTML;
+    }
+
+    /**
+     * Build homework popup body HTML.
+     */
+    private function getHomeworkPopupBodyHtml(): string
+    {
+        return <<<'HTML'
+<p>Weekly assignments and reminders.</p>
+<div class="sb-list">
+  <div class="sb-row"><span>Math worksheet</span><span>Due Tue</span></div>
+  <div class="sb-row"><span>Reading pages 20-30</span><span>Due Wed</span></div>
+</div>
+HTML;
+    }
+
+    /**
+     * Build links popup body HTML.
+     */
+    private function getLinksPopupBodyHtml(): string
+    {
+        return <<<'HTML'
+<p>Helpful resources for students and families.</p>
+<div class="sb-list">
+  <div class="sb-row"><span>Class portal</span><span>portal.example</span></div>
+  <div class="sb-row"><span>Weekly newsletter</span><span>newsletter.example</span></div>
+</div>
+HTML;
+    }
+
+    /**
+     * Build contacts popup body HTML.
+     */
+    private function getContactsPopupBodyHtml(): string
+    {
+        return <<<'HTML'
+<p>Important contacts for the classroom.</p>
+<div class="sb-list">
+  <div class="sb-row"><span>Teacher</span><span>teacher@schoolist.co.il</span></div>
+  <div class="sb-row"><span>School office</span><span>03-0000000</span></div>
+</div>
+HTML;
+    }
+
+    /**
+     * Build food popup body HTML.
+     */
+    private function getFoodPopupBodyHtml(): string
+    {
+        return <<<'HTML'
+<p>This week's menu highlights.</p>
+<div class="sb-list">
+  <div class="sb-row"><span>Monday</span><span>Pasta</span></div>
+  <div class="sb-row"><span>Tuesday</span><span>Chicken salad</span></div>
+</div>
+HTML;
+    }
+
+    /**
+     * Build schedule popup body HTML.
+     */
+    private function getSchedulePopupBodyHtml(): string
+    {
+        return <<<'HTML'
+<p>Upcoming schedule changes.</p>
+<div class="sb-list">
+  <div class="sb-row"><span>Friday</span><span>Short day</span></div>
+  <div class="sb-row"><span>Next week</span><span>Field trip</span></div>
+</div>
+HTML;
     }
 
     /**
