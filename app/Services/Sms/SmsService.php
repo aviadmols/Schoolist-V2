@@ -90,8 +90,9 @@ class SmsService
     {
         $setting = SmsSetting::where('provider', 'sms019')->first();
         $template = $setting?->otp_message_template ?: 'קוד האימות שלך הוא: {{code}}';
+        $message = str_replace('{{code}}', $code, $template);
 
-        return str_replace('{{code}}', $code, $template);
+        return $this->formatOtpMessageForAutoFill($message);
     }
 
     /**
@@ -157,5 +158,39 @@ class SmsService
         }
 
         return substr($body, 0, $maxLength).'...';
+    }
+
+    /**
+     * Format OTP message to support SMS auto-fill.
+     */
+    private function formatOtpMessageForAutoFill(string $message): string
+    {
+        $trimmed = trim($message);
+        $prefix = '<#> ';
+        $host = $this->getOtpSmsHost();
+
+        if ($host === '') {
+            return str_starts_with($trimmed, '<#>') ? $trimmed : $prefix.$trimmed;
+        }
+
+        $suffix = "\n@".$host;
+        $withPrefix = str_starts_with($trimmed, '<#>') ? $trimmed : $prefix.$trimmed;
+
+        if (str_contains($withPrefix, '@'.$host)) {
+            return $withPrefix;
+        }
+
+        return $withPrefix.$suffix;
+    }
+
+    /**
+     * Resolve the host for SMS auto-fill.
+     */
+    private function getOtpSmsHost(): string
+    {
+        $appUrl = (string) config('app.url');
+        $host = parse_url($appUrl, PHP_URL_HOST);
+
+        return $host ? (string) $host : '';
     }
 }

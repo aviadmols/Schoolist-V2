@@ -36,7 +36,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import AuthLayout from '../../layouts/AuthLayout.vue';
 import UiButton from '../../components/ui/UiButton.vue';
 import UiField from '../../components/ui/UiField.vue';
@@ -55,6 +55,8 @@ const lastName = ref('');
 const email = ref('');
 const error = ref(null);
 const isSubmitting = ref(false);
+const isOtpListening = ref(false);
+const otpAbortController = ref(null);
 
 const submitLabel = computed(() => {
   if (step.value === 'phone') return 'שלח קוד אימות';
@@ -89,6 +91,58 @@ async function postJson(url, payload) {
   }
 
   return data;
+}
+
+/**
+ * Check if the browser supports Web OTP.
+ *
+ * @returns {boolean}
+ */
+function supportsWebOtp() {
+  return typeof window !== 'undefined' && 'OTPCredential' in window && window.isSecureContext;
+}
+
+/**
+ * Start listening for an SMS OTP code.
+ *
+ * @returns {Promise<void>}
+ */
+async function startOtpListener() {
+  if (!supportsWebOtp() || isOtpListening.value || step.value !== 'code') return;
+
+  isOtpListening.value = true;
+  const controller = new AbortController();
+  otpAbortController.value = controller;
+
+  try {
+    const otp = await navigator.credentials.get({
+      otp: { transport: ['sms'] },
+      signal: controller.signal,
+    });
+
+    if (otp?.code) {
+      code.value = otp.code;
+      handleSubmit();
+    }
+  } catch (_) {
+    // Ignore errors or aborts.
+  } finally {
+    isOtpListening.value = false;
+    otpAbortController.value = null;
+  }
+}
+
+/**
+ * Stop listening for OTP codes.
+ *
+ * @returns {void}
+ */
+function stopOtpListener() {
+  if (otpAbortController.value) {
+    otpAbortController.value.abort();
+    otpAbortController.value = null;
+  }
+  isOtpListening.value = false;
 }
 
 /**
@@ -140,4 +194,13 @@ function handleSubmit() {
     .catch(() => { error.value = 'הרישום נכשל.'; })
     .finally(() => { isSubmitting.value = false; });
 }
+
+watch(step, (next) => {
+  if (next === 'code') {
+    startOtpListener();
+    return;
+  }
+
+  stopOtpListener();
+});
 </script>

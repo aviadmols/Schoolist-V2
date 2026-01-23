@@ -80,6 +80,64 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
             ->all();
     };
 
+    $announcementFeed = $announcementService->getActiveFeed($classroom);
+    $eventAnnouncements = $announcementFeed->filter(fn (array $announcement) => ($announcement['type'] ?? '') === 'event');
+    $announcements = $announcementFeed->reject(fn (array $announcement) => ($announcement['type'] ?? '') === 'event');
+    $weekStart = $today->copy()->startOfWeek();
+    $weekEnd = $today->copy()->endOfWeek();
+
+    $resolveAnnouncementDate = function (array $announcement) use ($today, $classroom): Carbon {
+        if (!empty($announcement['occurs_on_date'])) {
+            return Carbon::parse($announcement['occurs_on_date'], $classroom->timezone);
+        }
+
+        if ($announcement['day_of_week'] !== null) {
+            $targetDay = (int) $announcement['day_of_week'];
+            $candidate = $today->copy();
+
+            if ($candidate->dayOfWeek === $targetDay && $candidate->hour < 16) {
+                return $candidate->startOfDay();
+            }
+
+            return $candidate->next($targetDay)->startOfDay();
+        }
+
+        return $today->copy()->startOfDay();
+    };
+
+    $eventItems = $eventAnnouncements
+        ->map(function (array $announcement) use ($resolveAnnouncementDate) {
+            $date = $resolveAnnouncementDate($announcement);
+
+            return [
+                'title' => $announcement['title'] ?? '',
+                'date' => $date,
+                'time' => $announcement['occurs_at_time'] ? substr((string) $announcement['occurs_at_time'], 0, 5) : null,
+                'location' => $announcement['location'] ?? null,
+            ];
+        });
+
+    $eventsToday = $eventItems
+        ->filter(fn (array $event) => $event['date']->isSameDay($today))
+        ->map(function (array $event): array {
+            $event['date'] = $event['date']->format('d.m.Y');
+
+            return $event;
+        })
+        ->values()
+        ->all();
+
+    $eventsWeek = $eventItems
+        ->filter(fn (array $event) => $event['date']->between($weekStart, $weekEnd))
+        ->reject(fn (array $event) => $event['date']->isSameDay($today))
+        ->map(function (array $event): array {
+            $event['date'] = $event['date']->format('d.m.Y');
+
+            return $event;
+        })
+        ->values()
+        ->all();
+
     $pageData = [
         'school_year' => ($today->month >= 9 ? $today->year : $today->year - 1).'-'.(($today->month >= 9 ? $today->year : $today->year - 1) + 1),
         'classroom' => [
@@ -93,9 +151,9 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
         'selected_day' => $selectedDay,
         'day_labels' => ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'],
         'timetable' => $timetableService->getWeeklyTimetable($classroom),
-        'announcements' => $announcementService->getActiveFeed($classroom),
-        'events_today' => $mapHolidays($today, $today),
-        'events_week' => $mapHolidays($today->copy()->startOfWeek(), $today->copy()->endOfWeek()),
+        'announcements' => $announcements->values()->all(),
+        'events_today' => array_merge($mapHolidays($today, $today), $eventsToday),
+        'events_week' => array_merge($mapHolidays($weekStart, $weekEnd), $eventsWeek),
         'links' => ClassLink::where('classroom_id', $classroom->id)
             ->orderBy('sort_order', 'asc')
             ->get()
