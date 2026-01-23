@@ -195,6 +195,10 @@ class TemplateManager
             return $this->getDefaultLoginPageHtml();
         }
 
+        if ($key === 'auth.qlink') {
+            return $this->getDefaultQlinkPageHtml();
+        }
+
         return '';
     }
 
@@ -465,6 +469,110 @@ HTML;
     </div>
   </div>
 </div>
+HTML;
+    }
+
+    /**
+     * Build the default qlink HTML.
+     */
+    private function getDefaultQlinkPageHtml(): string
+    {
+        return <<<'HTML'
+<style>
+  .sb-qlink-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px 16px; background: #f8fafc; font-family: "Inter", Arial, sans-serif; }
+  .sb-qlink-card { width: 100%; max-width: 420px; background: #ffffff; border-radius: 20px; padding: 28px; box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12); }
+  .sb-qlink-title { font-size: 20px; font-weight: 700; margin: 0 0 6px; color: #0f172a; }
+  .sb-qlink-subtitle { font-size: 13px; color: #64748b; margin-bottom: 18px; }
+  .sb-qlink-stack { display: grid; gap: 12px; }
+  .sb-qlink-field { display: grid; gap: 6px; font-size: 12px; color: #475569; }
+  .sb-qlink-input { width: 100%; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+  .sb-qlink-button { width: 100%; border: none; border-radius: 12px; background: #2563eb; color: #ffffff; padding: 12px; font-weight: 600; cursor: pointer; }
+  .sb-qlink-note { font-size: 12px; color: #64748b; }
+  .sb-qlink-error { color: #b91c1c; font-size: 12px; }
+</style>
+<div class="sb-qlink-page">
+  <div class="sb-qlink-card" data-qlink-token="{{ $page['token'] ?? '' }}">
+    <h1 class="sb-qlink-title">Enter your phone</h1>
+    <p class="sb-qlink-subtitle">We will send a one-time code to continue.</p>
+    <form class="sb-qlink-stack" data-qlink-form>
+      <div class="sb-qlink-error" data-qlink-error style="display: none;"></div>
+      <label class="sb-qlink-field">
+        Phone
+        <input type="text" name="phone" class="sb-qlink-input" placeholder="0500000000" autocomplete="tel">
+      </label>
+      <label class="sb-qlink-field" data-qlink-code-field style="display: none;">
+        Code
+        <input type="text" name="code" class="sb-qlink-input" placeholder="123456" autocomplete="one-time-code">
+      </label>
+      <button type="submit" class="sb-qlink-button">Send code</button>
+      <div class="sb-qlink-note">By continuing you agree to receive an SMS for verification.</div>
+    </form>
+  </div>
+</div>
+<script>
+  (function () {
+    const root = document.querySelector('[data-qlink-form]');
+    if (!root) return;
+
+    const wrapper = document.querySelector('[data-qlink-token]');
+    const token = wrapper?.getAttribute('data-qlink-token') || '';
+    const errorEl = document.querySelector('[data-qlink-error]');
+    const codeField = document.querySelector('[data-qlink-code-field]');
+    const submitButton = root.querySelector('button[type="submit"]');
+    let step = 'phone';
+
+    const getCsrfToken = () => {
+      const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+      return match ? decodeURIComponent(match[1]) : '';
+    };
+
+    const requestJson = async (url, payload) => {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': getCsrfToken(),
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw data;
+      }
+
+      return data;
+    };
+
+    root.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      errorEl.style.display = 'none';
+
+      const phone = root.querySelector('input[name="phone"]').value;
+      const code = root.querySelector('input[name="code"]').value;
+
+      try {
+        if (step === 'phone') {
+          await requestJson('/qlink/request', { phone, qlink_token: token });
+          step = 'code';
+          codeField.style.display = 'grid';
+          submitButton.textContent = 'Verify code';
+          return;
+        }
+
+        const data = await requestJson('/qlink/verify', { phone, code, qlink_token: token });
+        if (data.redirect_url) {
+          window.location.href = data.redirect_url;
+        }
+      } catch (err) {
+        const message = err?.message || err?.phone?.[0] || err?.code?.[0] || 'Request failed.';
+        errorEl.textContent = message;
+        errorEl.style.display = 'block';
+      }
+    });
+  })();
+</script>
 HTML;
     }
 

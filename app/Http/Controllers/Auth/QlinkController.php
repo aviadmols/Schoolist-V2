@@ -12,6 +12,7 @@ use App\Models\SmsLog;
 use App\Models\SmsSetting;
 use App\Models\User;
 use App\Services\Auth\OtpService;
+use App\Services\Builder\TemplateRenderer;
 use App\Services\Classroom\ClassroomContextService;
 use App\Services\Classroom\ClassroomService;
 use Carbon\Carbon;
@@ -34,7 +35,7 @@ class QlinkController extends Controller
     /**
      * Show the qlink login page.
      */
-    public function show(string $token): Response
+    public function show(string $token, TemplateRenderer $renderer): Response
     {
         $isValid = $this->isValidToken($token);
         $qlink = $this->getOrCreateQlink($token);
@@ -46,6 +47,23 @@ class QlinkController extends Controller
                 'request_id' => request()->header('X-Request-Id'),
                 'ip_address' => request()->ip(),
                 'user_agent' => request()->userAgent(),
+            ]);
+        }
+
+        $overrideParts = $renderer->renderPublishedPartsByKey('auth.qlink', [
+            'user' => auth()->user(),
+            'locale' => app()->getLocale(),
+            'page' => [
+                'token' => $token,
+                'is_valid' => $isValid,
+            ],
+        ]);
+
+        if ($overrideParts) {
+            return response()->view('builder.screen', [
+                'html' => $overrideParts['html'],
+                'css' => $overrideParts['css'],
+                'js' => $overrideParts['js'],
             ]);
         }
 

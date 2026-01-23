@@ -6,12 +6,39 @@ return [
     'allowed_keys' => [
         'classroom.page',
         'auth.login',
+        'auth.qlink',
     ],
     'allowed_template_variables' => [
         'user',
         'classroom',
         'locale',
         'page',
+    ],
+    'default_popups' => [
+        [
+            'key' => 'invite',
+            'title' => 'Invite Parents',
+        ],
+        [
+            'key' => 'homework',
+            'title' => 'Homework',
+        ],
+        [
+            'key' => 'links',
+            'title' => 'Useful Links',
+        ],
+        [
+            'key' => 'contacts',
+            'title' => 'Important Contacts',
+        ],
+        [
+            'key' => 'food',
+            'title' => 'What We Eat',
+        ],
+        [
+            'key' => 'schedule',
+            'title' => 'Weekly Schedule',
+        ],
     ],
     'max_include_depth' => 5,
 ];
