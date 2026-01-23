@@ -53,6 +53,7 @@ class TemplateRenderer
         }
 
         $parts = $this->getTemplatePartsByVersion($template, 'published');
+        $parts = $this->ensureClassroomTabs($template, $parts);
 
         if (!$this->isTemplateSafe($parts['html'], $parts['css'], $parts['js'])) {
             return null;
@@ -71,6 +72,7 @@ class TemplateRenderer
     public function renderPreviewParts(BuilderTemplate $template, string $version, array $data = []): array
     {
         $parts = $this->getTemplatePartsByVersion($template, $version);
+        $parts = $this->ensureClassroomTabs($template, $parts);
 
         if (!$this->isTemplateSafe($parts['html'], $parts['css'], $parts['js'])) {
             return [
@@ -312,6 +314,44 @@ class TemplateRenderer
             'css' => $parts['css'] ? Blade::render($parts['css'], $filteredData) : null,
             'js' => $parts['js'] ? Blade::render($parts['js'], $filteredData) : null,
         ];
+    }
+
+    /**
+     * Ensure classroom templates render day tabs when missing.
+     *
+     * @param array{html: string, css: string|null, js: string|null} $parts
+     * @return array{html: string, css: string|null, js: string|null}
+     */
+    private function ensureClassroomTabs(BuilderTemplate $template, array $parts): array
+    {
+        if ($template->key !== 'classroom.page') {
+            return $parts;
+        }
+
+        if (str_contains($parts['html'], 'day-tabs-container')) {
+            return $parts;
+        }
+
+        $tabsHtml = <<<'HTML'
+<div class="day-tabs-container">
+  @foreach (($page['day_labels'] ?? ['א','ב','ג','ד','ה','ו','ש']) as $dayIndex => $dayLabel)
+    <button type="button" class="day-tab {{ (int) ($page['selected_day'] ?? 0) === $dayIndex ? 'active' : '' }}">
+      {{ $dayLabel }}
+    </button>
+  @endforeach
+</div>
+HTML;
+
+        $tabsCss = <<<'CSS'
+.day-tabs-container { display: flex; gap: 8px; overflow-x: auto; padding: 12px 16px; }
+.day-tab { border: none; background: #f1f5f9; color: #0f172a; border-radius: 999px; padding: 6px 10px; font-size: 12px; }
+.day-tab.active { background: #e0f2fe; color: #2563eb; font-weight: 700; }
+CSS;
+
+        $parts['html'] = $tabsHtml."\n".$parts['html'];
+        $parts['css'] = $parts['css'] ? ($tabsCss."\n".$parts['css']) : $tabsCss;
+
+        return $parts;
     }
 
     /**

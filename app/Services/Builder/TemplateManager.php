@@ -215,6 +215,7 @@ class TemplateManager
   .sb-popup.is-open { opacity: 1; pointer-events: auto; }
   .sb-popup-card { width: 100%; max-width: 420px; background: #ffffff; border-radius: 24px 24px 0 0; padding: 20px; transform: translateY(40px); transition: transform 240ms ease; }
   .sb-popup.is-open .sb-popup-card { transform: translateY(0); }
+  .logo-image { height: 20px; width: auto; display: block; }
 </style>
 
 <div class="mobile-wrapper">
@@ -403,7 +404,11 @@ class TemplateManager
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
       שיתוף הדף
     </div>
-    <div class="logo-text">schoolist</div>
+    <img
+      class="logo-image"
+      src="https://app.schoolist.co.il/storage/media/assets/ACV8xtboYh09FCcYQkpp2uPbUqQDaCe93qcqajxN.svg"
+      alt="Schoolist logo"
+    >
   </footer>
 </div>
 
