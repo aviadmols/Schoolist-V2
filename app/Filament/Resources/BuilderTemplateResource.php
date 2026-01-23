@@ -5,11 +5,15 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\BuilderTemplateResource\Pages;
 use App\Forms\Components\CodeEditor;
 use App\Models\BuilderTemplate;
+use App\Models\Classroom;
+use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Get;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -51,16 +55,50 @@ class BuilderTemplateResource extends Resource
                 ->label('Override Enabled'),
             Grid::make(2)
                 ->schema([
+                    Select::make('preview_classroom_id')
+                        ->label('Preview Classroom')
+                        ->options(function (): array {
+                            return Classroom::query()
+                                ->orderBy('name', 'asc')
+                                ->limit(50)
+                                ->pluck('name', 'id')
+                                ->all();
+                        })
+                        ->searchable()
+                        ->live()
+                        ->dehydrated(false),
+                    Select::make('preview_user_id')
+                        ->label('Preview User')
+                        ->options(function (): array {
+                            return User::query()
+                                ->orderBy('name', 'asc')
+                                ->limit(50)
+                                ->pluck('name', 'id')
+                                ->all();
+                        })
+                        ->searchable()
+                        ->live()
+                        ->dehydrated(false),
+                ])
+                ->columnSpanFull(),
+            Grid::make(2)
+                ->schema([
                     Section::make('Preview')
                         ->schema([
                             Placeholder::make('preview')
                                 ->label('')
-                                ->content(function (?BuilderTemplate $record): HtmlString {
+                                ->content(function (?BuilderTemplate $record, Get $get): HtmlString {
                                     if (!$record) {
                                         return new HtmlString('');
                                     }
 
-                                    $url = route('builder.preview', ['template' => $record, 'version' => 'draft']);
+                                    $params = array_filter([
+                                        'template' => $record,
+                                        'version' => 'draft',
+                                        'preview_classroom_id' => $get('preview_classroom_id'),
+                                        'preview_user_id' => $get('preview_user_id'),
+                                    ]);
+                                    $url = route('builder.preview', $params);
 
                                     return new HtmlString(
                                         view('filament.builder-template-preview', ['previewUrl' => $url])->render()

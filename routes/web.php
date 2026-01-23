@@ -7,7 +7,13 @@ use App\Http\Controllers\Auth\GetOtpLoginPageController;
 use App\Http\Controllers\Auth\QlinkController;
 use App\Http\Controllers\Admin\Builder\TemplatePreviewController;
 use App\Http\Controllers\Public\GetLandingPageController;
+use App\Models\ClassLink;
+use App\Models\ImportantContact;
+use App\Services\Announcements\AnnouncementFeedService;
 use App\Services\Builder\TemplateRenderer;
+use App\Services\Classroom\HolidayService;
+use App\Services\Classroom\TimetableService;
+use Carbon\Carbon;
 
 Route::get('/', GetLandingPageController::class)->name('landing');
 
@@ -50,7 +56,32 @@ Route::post('/qlink/auto', [QlinkController::class, 'autoLogin'])->name('qlink.a
 
 Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
     $classroom->load(['city', 'school']);
+    $today = Carbon::now($classroom->timezone);
+    $selectedDay = (int) request()->query('day', $today->dayOfWeek);
+    $timetableService = app(TimetableService::class);
+    $announcementService = app(AnnouncementFeedService::class);
+    $holidayService = app(HolidayService::class);
+    $holidays = $holidayService->getUpcomingHolidays($classroom);
+
+    $mapHolidays = function (Carbon $from, Carbon $to) use ($holidays): array {
+        return $holidays
+            ->filter(function ($holiday) use ($from, $to) {
+                return $holiday->start_date && $holiday->start_date->between($from, $to);
+            })
+            ->map(function ($holiday): array {
+                return [
+                    'title' => $holiday->name,
+                    'date' => $holiday->start_date?->format('d.m.Y'),
+                    'time' => null,
+                    'location' => $holiday->description,
+                ];
+            })
+            ->values()
+            ->all();
+    };
+
     $pageData = [
+        'school_year' => ($today->month >= 9 ? $today->year : $today->year - 1).'-'.(($today->month >= 9 ? $today->year : $today->year - 1) + 1),
         'classroom' => [
             'id' => $classroom->id,
             'name' => $classroom->name,
@@ -59,10 +90,39 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
             'city_name' => $classroom->city?->name,
             'school_name' => $classroom->school?->name,
         ],
-        'selected_day' => (int) now()->dayOfWeek,
-        'timetable' => [],
-        'announcements' => [],
-        'timetable_image' => null,
+        'selected_day' => $selectedDay,
+        'day_labels' => ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'],
+        'timetable' => $timetableService->getWeeklyTimetable($classroom),
+        'announcements' => $announcementService->getActiveFeed($classroom),
+        'events_today' => $mapHolidays($today, $today),
+        'events_week' => $mapHolidays($today->copy()->startOfWeek(), $today->copy()->endOfWeek()),
+        'links' => ClassLink::where('classroom_id', $classroom->id)
+            ->orderBy('sort_order', 'asc')
+            ->get()
+            ->map(function (ClassLink $link): array {
+                return [
+                    'title' => $link->title,
+                    'url' => $link->url,
+                    'icon' => $link->icon,
+                ];
+            })
+            ->values()
+            ->all(),
+        'important_contacts' => ImportantContact::where('classroom_id', $classroom->id)
+            ->orderBy('first_name', 'asc')
+            ->get()
+            ->map(function (ImportantContact $contact): array {
+                return [
+                    'name' => trim($contact->first_name.' '.$contact->last_name),
+                    'role' => $contact->role,
+                    'phone' => $contact->phone,
+                    'email' => $contact->email,
+                ];
+            })
+            ->values()
+            ->all(),
+        'weather_text' => '16-20° - מזג אוויר נוח.',
+        'timetable_image' => $timetableService->getTimetableImageUrl($classroom),
     ];
 
     $overrideParts = app(TemplateRenderer::class)->renderPublishedPartsByKey('classroom.page', [

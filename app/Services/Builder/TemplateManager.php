@@ -209,141 +209,205 @@ class TemplateManager
     {
         return <<<'HTML'
 <style>
-  .sb-page { background: #0b0b0b; padding: 32px 0 64px; font-family: "Inter", Arial, sans-serif; }
-  .sb-container { max-width: 420px; margin: 0 auto; padding: 0 16px; }
-  .sb-stack { display: grid; gap: 16px; }
-  .sb-card { background: #ffffff; border-radius: 20px; padding: 18px; box-shadow: 0 14px 40px rgba(0,0,0,0.25); }
-  .sb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-  .sb-header-left { display: flex; gap: 10px; align-items: center; }
-  .sb-badge { width: 46px; height: 46px; border-radius: 999px; background: #ffedd5; display:flex; align-items:center; justify-content:center; font-weight:700; color:#ea580c; }
-  .sb-title { font-size: 14px; font-weight: 700; color: #111827; margin: 0; }
-  .sb-subtitle { font-size: 12px; color: #6b7280; }
-  .sb-actions { display: flex; gap: 10px; color: #9ca3af; }
-  .sb-action { width: 28px; height: 28px; border-radius: 8px; background: #f3f4f6; display:flex; align-items:center; justify-content:center; font-size: 12px; }
-  .sb-tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
-  .sb-tab { padding: 6px 10px; border-radius: 999px; font-size: 12px; background: #f3f4f6; color:#111827; text-decoration: none; }
-  .sb-tab.is-active { background: #e5f0ff; color:#1d4ed8; font-weight: 600; }
-  .sb-section-title { font-size: 14px; font-weight: 700; margin: 10px 0 8px; color:#111827; }
-  .sb-list { display: grid; gap: 10px; font-size: 13px; color:#111827; }
-  .sb-row { display:flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid #f3f4f6; padding-bottom: 8px; }
-  .sb-note { background: #eff6ff; border-radius: 12px; padding: 10px 12px; display:flex; justify-content: space-between; align-items: center; font-size: 12px; }
-  .sb-links-title { text-align: center; font-size: 14px; font-weight: 700; margin: 8px 0 4px; }
-  .sb-links { display: grid; gap: 10px; }
-  .sb-link-card { background: #ffffff; border-radius: 16px; padding: 10px 12px; display:flex; align-items:center; justify-content: space-between; box-shadow: 0 10px 28px rgba(0,0,0,0.2); text-decoration: none; color: inherit; }
-  .sb-link-label { display:flex; align-items:center; gap: 10px; font-size: 13px; }
-  .sb-icon { width: 34px; height: 34px; border-radius: 12px; background: #eef2ff; display:flex; align-items:center; justify-content:center; font-weight:700; color:#1e3a8a; }
-  .sb-link-action { font-size: 18px; color: #9ca3af; }
-  .sb-footer { margin-top: 20px; text-align:center; color:#6b7280; font-size: 12px; }
-  .sb-modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(0,0,0,0.6); z-index: 1000; }
-  .sb-modal:target { display: flex; }
-  .sb-modal-card { background: #ffffff; border-radius: 16px; padding: 18px; width: 100%; max-width: 360px; box-shadow: 0 12px 28px rgba(0,0,0,0.3); }
-  .sb-modal-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
-  .sb-modal-body { font-size: 13px; color:#374151; margin-bottom: 16px; }
-  .sb-modal-actions { display:flex; justify-content:flex-end; gap: 8px; }
-  .sb-button { display:inline-block; padding: 8px 12px; border-radius: 10px; background: #2563eb; color:#fff; font-size: 12px; text-decoration: none; }
-  .sb-button.is-ghost { background: #e5e7eb; color:#111827; }
-  .sb-link { text-decoration: none; color: inherit; }
+  .sb-popup-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.55); opacity: 0; pointer-events: none; transition: opacity 200ms ease; z-index: 40; }
+  .sb-popup-backdrop.is-open { opacity: 1; pointer-events: auto; }
+  .sb-popup { position: fixed; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding: 16px; opacity: 0; pointer-events: none; transition: opacity 200ms ease; z-index: 50; }
+  .sb-popup.is-open { opacity: 1; pointer-events: auto; }
+  .sb-popup-card { width: 100%; max-width: 420px; background: #ffffff; border-radius: 24px 24px 0 0; padding: 20px; transform: translateY(40px); transition: transform 240ms ease; }
+  .sb-popup.is-open .sb-popup-card { transform: translateY(0); }
 </style>
-<div class="sb-page">
-  <div class="sb-container sb-stack">
-    <div class="sb-card">
-      <div class="sb-header">
-        <div class="sb-header-left">
-          <div class="sb-badge">
-            {{ $page['classroom']['grade_level'] ?? '' }}'{{ $page['classroom']['grade_number'] ?? '' }}
-          </div>
-          <div>
-            <h2 class="sb-title">{{ $page['classroom']['school_name'] ?? ($page['classroom']['name'] ?? 'Classroom') }}</h2>
-            <div class="sb-subtitle">2025-2026</div>
-          </div>
-        </div>
-        <div class="sb-actions">
-          <a href="#popup-contacts" class="sb-action">U</a>
-          <a href="#popup-invite" class="sb-action">E</a>
-        </div>
-      </div>
 
-      <div class="sb-tabs">
-        @foreach (['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as \$dayIndex => \$dayLabel)
-          <a class="sb-tab {{ (int) (\$page['selected_day'] ?? 0) === \$dayIndex ? 'is-active' : '' }}" href="#popup-schedule">
-            {{ \$dayLabel }}
-          </a>
+<div class="mobile-wrapper">
+  <header class="header">
+    <div class="header-actions">
+      <button type="button" class="icon-btn" data-popup-target="popup-contacts">
+        <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+      </button>
+      <button type="button" class="icon-btn" data-popup-target="popup-invite">
+        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+      </button>
+    </div>
+
+    <div class="header-info">
+      <div class="school-text">
+        <span class="school-year">{{ $page['school_year'] ?? '' }}</span>
+        <span class="school-name">{{ $page['classroom']['school_name'] ?? ($page['classroom']['name'] ?? '') }}</span>
+      </div>
+      <div class="class-badge">{{ $page['classroom']['grade_level'] ?? '' }}{{ $page['classroom']['grade_number'] ?? '' }}</div>
+    </div>
+  </header>
+
+  <div class="day-tabs-container">
+    @foreach (($page['day_labels'] ?? ['א','ב','ג','ד','ה','ו','ש']) as $dayIndex => $dayLabel)
+      <button
+        type="button"
+        class="day-tab {{ (int) ($page['selected_day'] ?? 0) === $dayIndex ? 'active' : '' }}"
+        data-popup-target="popup-schedule"
+      >
+        {{ $dayLabel }}
+      </button>
+    @endforeach
+  </div>
+
+  <div class="card card-stacked-top">
+    <div class="card-header">
+      <svg class="icon-edit-small" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+      <div class="card-title">יום {{ ($page['day_labels'] ?? ['א','ב','ג','ד','ה','ו','ש'])[(int) ($page['selected_day'] ?? 0)] ?? '' }} <span class="card-title-light">בוקר טוב!</span></div>
+    </div>
+
+    <div class="schedule-list">
+      @php
+        $dayIndex = (int) ($page['selected_day'] ?? 0);
+        $dayEntries = $page['timetable'][$dayIndex] ?? [];
+      @endphp
+      @if (!empty($dayEntries))
+        @foreach ($dayEntries as $entry)
+          <div class="schedule-row">
+            <span class="schedule-time">{{ $entry['start_time'] ?? '' }}-{{ $entry['end_time'] ?? '' }}</span>
+            <span class="schedule-subject">{{ $entry['subject'] ?? '' }}</span>
+          </div>
         @endforeach
-      </div>
-
-      <div class="sb-section-title">
-        Day {{ ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][(int) (\$page['selected_day'] ?? 0)] }} <span class="sb-subtitle">Good morning!</span>
-      </div>
-      <div class="sb-list">
-        @if (!empty(\$page['timetable']) && !empty(\$page['timetable'][\$page['selected_day'] ?? 0]))
-          @foreach (\$page['timetable'][\$page['selected_day'] ?? 0] as \$entry)
-            <div class="sb-row">
-              <span>{{ \$entry['start_time'] ?? '' }}-{{ \$entry['end_time'] ?? '' }}</span>
-              <span>{{ \$entry['subject'] ?? '' }}</span>
-            </div>
-          @endforeach
-        @else
-          <div class="sb-row"><span>08:00-09:00</span><span>Math</span></div>
-          <div class="sb-row"><span>09:00-10:00</span><span>Literature</span></div>
-          <div class="sb-row"><span>10:20-11:00</span><span>Arts</span></div>
-        @endif
-      </div>
-
-      <div class="sb-note">
-        <span>16-20 C, light breeze</span>
-        <span>Sunny</span>
-      </div>
-
-      <div class="sb-section-title">Announcements</div>
-      @if (!empty(\$page['announcements']))
-        <div class="sb-list">
-          @foreach (\$page['announcements'] as \$announcement)
-            <div class="sb-row">
-              <span>{{ \$announcement['title'] ?? '' }}</span>
-              <span>{{ \$announcement['is_done'] ? 'Done' : 'Open' }}</span>
-            </div>
-          @endforeach
-        </div>
       @else
-        <div class="sb-list">
-          <div class="sb-row"><span>No active announcements</span><span></span></div>
+        <div class="schedule-row">
+          <span class="schedule-time">08:00-09:00</span>
+          <span class="schedule-subject">---</span>
+        </div>
+      @endif
+    </div>
+  </div>
+
+  <div class="card" style="padding: 10px 20px; display: flex; align-items: center; justify-content: space-between;">
+    <div class="weather-text">
+      {{ $page['weather_text'] ?? '16-20° - מזג אוויר נוח.' }}
+    </div>
+    <svg class="weather-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+  </div>
+
+  <div class="card" style="padding-bottom: 70px;">
+    <div class="card-header">
+      <svg class="icon-edit-small" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+      <div class="card-title">הודעות</div>
+    </div>
+
+    <div class="notices-list">
+      @if (!empty($page['announcements']))
+        @foreach ($page['announcements'] as $announcement)
+          <div class="notice-row">
+            <svg class="check-icon {{ !empty($announcement['is_done']) ? 'check-blue' : 'check-black' }}" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span class="notice-content">{{ $announcement['title'] ?? ($announcement['content'] ?? '') }}</span>
+          </div>
+        @endforeach
+      @else
+        <div class="notice-row">
+          <div style="width:20px;"></div>
+          <span class="notice-content">אין הודעות כרגע</span>
         </div>
       @endif
     </div>
 
-    <div class="sb-card">
-      <div class="sb-links-title">Everything you need</div>
-      <div class="sb-links">
-        <a class="sb-link-card" href="#popup-invite">
-          <div class="sb-link-label"><span class="sb-icon">I</span>Invite Parents</div>
-          <span class="sb-link-action">+</span>
-        </a>
-        <a class="sb-link-card" href="#popup-homework">
-          <div class="sb-link-label"><span class="sb-icon">H</span>Homework</div>
-          <span class="sb-link-action">+</span>
-        </a>
-        <a class="sb-link-card" href="#popup-links">
-          <div class="sb-link-label"><span class="sb-icon">L</span>Useful Links</div>
-          <span class="sb-link-action">+</span>
-        </a>
-        <a class="sb-link-card" href="#popup-contacts">
-          <div class="sb-link-label"><span class="sb-icon">C</span>Important Contacts</div>
-          <span class="sb-link-action">+</span>
-        </a>
-        <a class="sb-link-card" href="#popup-food">
-          <div class="sb-link-label"><span class="sb-icon">F</span>What We Eat</div>
-          <span class="sb-link-action">+</span>
-        </a>
-        <a class="sb-link-card" href="#popup-schedule">
-          <div class="sb-link-label"><span class="sb-icon">S</span>Weekly Schedule</div>
-          <span class="sb-link-action">+</span>
-        </a>
-      </div>
+    <div class="fab-btn" data-popup-target="popup-homework">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <svg class="icon-edit-small" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+      <div class="card-title">אירועים</div>
     </div>
 
-    <div class="sb-footer">schoolist</div>
+    <div class="section-label">היום</div>
+    @if (!empty($page['events_today']))
+      @foreach ($page['events_today'] as $event)
+        <div class="event-item">
+          <div class="event-indicator-dot dot-blue"></div>
+          <div class="event-details">
+            <div class="event-title">{{ $event['title'] ?? '' }}</div>
+            <div class="event-meta">
+              <span>{{ $event['date'] ?? '' }}</span>
+              @if (!empty($event['time']))
+                <span>{{ $event['time'] }}</span>
+              @endif
+              @if (!empty($event['location']))
+                <span>{{ $event['location'] }}</span>
+              @endif
+              <svg class="event-icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            </div>
+          </div>
+        </div>
+      @endforeach
+    @else
+      <div class="event-item">
+        <div class="event-details">
+          <div class="event-title">אין אירועים להיום</div>
+        </div>
+      </div>
+    @endif
+
+    <div class="section-label">השבוע</div>
+    @if (!empty($page['events_week']))
+      @foreach ($page['events_week'] as $event)
+        <div class="event-item">
+          <div class="event-indicator-dot dot-purple"></div>
+          <div class="event-details">
+            <div class="event-title">{{ $event['title'] ?? '' }}</div>
+            <div class="event-meta">
+              <span>{{ $event['date'] ?? '' }}</span>
+              @if (!empty($event['time']))
+                <span>{{ $event['time'] }}</span>
+              @endif
+              @if (!empty($event['location']))
+                <span>{{ $event['location'] }}</span>
+              @endif
+              <svg class="event-icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            </div>
+          </div>
+        </div>
+      @endforeach
+    @else
+      <div class="event-item">
+        <div class="event-details">
+          <div class="event-title">אין אירועים לשבוע הקרוב</div>
+        </div>
+      </div>
+    @endif
   </div>
+
+  <h3 class="section-heading-external">כל מה שצריך לדעת</h3>
+
+  <div class="links-list">
+    @if (!empty($page['links']))
+      @foreach ($page['links'] as $link)
+        <a class="link-card" href="{{ $link['url'] ?? '#' }}" target="_blank" rel="noopener">
+          <svg class="icon-edit-small" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+          <div class="link-right-group">
+            <span class="link-text">{{ $link['title'] ?? '' }}</span>
+            <div class="icon-circle bg-blue">
+              <svg class="colored-icon" viewBox="0 0 24 24" fill="none" stroke="#1565C0"><circle cx="12" cy="12" r="10"></circle><path d="M12 8v8"></path><path d="M8 12h8"></path></svg>
+            </div>
+            <div class="drag-handle">☰</div>
+          </div>
+        </a>
+      @endforeach
+    @else
+      <div class="link-card">
+        <div class="link-right-group">
+          <span class="link-text">אין קישורים זמינים</span>
+        </div>
+      </div>
+    @endif
+  </div>
+
+  <footer class="footer">
+    <div class="share-btn" data-popup-target="popup-links">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+      שיתוף הדף
+    </div>
+    <div class="logo-text">schoolist</div>
+  </footer>
 </div>
+
+<div class="sb-popup-backdrop" data-popup-backdrop></div>
 
 [[popup:invite]]
 [[popup:homework]]
@@ -351,6 +415,45 @@ class TemplateManager
 [[popup:contacts]]
 [[popup:food]]
 [[popup:schedule]]
+
+<script>
+  (function () {
+    const backdrop = document.querySelector('[data-popup-backdrop]');
+    const popups = document.querySelectorAll('[data-popup]');
+
+    const closePopups = () => {
+      popups.forEach((popup) => popup.classList.remove('is-open'));
+      backdrop?.classList.remove('is-open');
+    };
+
+    const openPopup = (popupId) => {
+      const target = document.getElementById(popupId);
+      if (!target) return;
+      popups.forEach((popup) => popup.classList.remove('is-open'));
+      target.classList.add('is-open');
+      backdrop?.classList.add('is-open');
+    };
+
+    document.querySelectorAll('[data-popup-target]').forEach((trigger) => {
+      trigger.addEventListener('click', (event) => {
+        event.preventDefault();
+        const target = trigger.getAttribute('data-popup-target');
+        if (target) {
+          openPopup(target);
+        }
+      });
+    });
+
+    document.querySelectorAll('[data-popup-close]').forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        closePopups();
+      });
+    });
+
+    backdrop?.addEventListener('click', closePopups);
+  })();
+</script>
 HTML;
     }
 
@@ -363,15 +466,15 @@ HTML;
         $body = $this->getPopupBodyHtml($key);
 
         return <<<HTML
-<div id="{$id}" class="sb-modal">
-  <div class="sb-modal-card">
+<div id="{$id}" class="sb-popup" data-popup>
+  <div class="sb-popup-card">
     <div class="sb-modal-title">{$title}</div>
     <div class="sb-modal-body">
       {$body}
     </div>
     <div class="sb-modal-actions">
-      <a href="#" class="sb-button is-ghost">Close</a>
-      <a href="#" class="sb-button">Done</a>
+      <button type="button" class="sb-button is-ghost" data-popup-close>סגור</button>
+      <button type="button" class="sb-button" data-popup-close>סיום</button>
     </div>
   </div>
 </div>
@@ -419,6 +522,10 @@ HTML;
         $draftHtml = (string) ($template->draft_html ?? '');
 
         if (str_contains($draftHtml, 'This is a sample popup template')) {
+            return true;
+        }
+
+        if ($key === 'classroom.page' && str_contains($draftHtml, 'sb-page')) {
             return true;
         }
 
