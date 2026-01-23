@@ -6,6 +6,7 @@ use App\Filament\Resources\MediaFileResource;
 use App\Services\Builder\MediaService;
 use Filament\Actions;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Select;
 use Filament\Resources\Pages\ListRecords;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
@@ -22,19 +23,35 @@ class ListMediaFiles extends ListRecords
             Actions\Action::make('upload')
                 ->label('Upload Media')
                 ->form([
-                    FileUpload::make('file')
-                        ->label('File')
+                    Select::make('folder')
+                        ->label('Folder')
+                        ->options([
+                            'assets' => 'Assets',
+                            'fonts' => 'Fonts',
+                        ])
+                        ->default('assets')
+                        ->required(),
+                    FileUpload::make('files')
+                        ->label('Files')
                         ->required()
+                        ->multiple()
                         ->storeFiles(false),
                 ])
                 ->action(function (array $data): void {
-                    $file = $data['file'] ?? null;
+                    $files = $data['files'] ?? [];
+                    $directory = is_string($data['folder'] ?? null) ? $data['folder'] : 'assets';
 
-                    if (!$file instanceof TemporaryUploadedFile) {
+                    if (!is_array($files)) {
                         return;
                     }
 
-                    app(MediaService::class)->storeUploadedFile($file);
+                    foreach ($files as $file) {
+                        if (!$file instanceof TemporaryUploadedFile) {
+                            continue;
+                        }
+
+                        app(MediaService::class)->storeUploadedFile($file, $directory);
+                    }
                 }),
         ];
     }

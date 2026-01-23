@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Gate;
 
 class MediaFileResource extends Resource
 {
+    private const BYTES_IN_KILOBYTE = 1024;
+    private const BYTES_IN_MEGABYTE = 1048576;
+
     protected static ?string $model = MediaFile::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-photo';
@@ -34,12 +37,12 @@ class MediaFileResource extends Resource
                     ->formatStateUsing(function ($state): string {
                         $size = (int) $state;
 
-                        if ($size >= 1024 * 1024) {
-                            return number_format($size / (1024 * 1024), 2).' MB';
+                        if ($size >= self::BYTES_IN_MEGABYTE) {
+                            return number_format($size / self::BYTES_IN_MEGABYTE, 2).' MB';
                         }
 
-                        if ($size >= 1024) {
-                            return number_format($size / 1024, 2).' KB';
+                        if ($size >= self::BYTES_IN_KILOBYTE) {
+                            return number_format($size / self::BYTES_IN_KILOBYTE, 2).' KB';
                         }
 
                         return $size.' B';
@@ -47,7 +50,9 @@ class MediaFileResource extends Resource
                 Tables\Columns\TextColumn::make('url')
                     ->label('URL')
                     ->copyable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->url(function (MediaFile $record): string {
+                        return $record->url;
+                    }, shouldOpenInNewTab: true),
                 Tables\Columns\TextColumn::make('uploader.name')
                     ->label('Uploaded By')
                     ->placeholder('-'),

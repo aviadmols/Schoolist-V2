@@ -14,9 +14,9 @@ class MediaService
     /**
      * Store an uploaded file and create metadata record.
      */
-    public function storeUploadedFile(UploadedFile $file): MediaFile
+    public function storeUploadedFile(UploadedFile $file, string $directory = 'assets'): MediaFile
     {
-        $path = $file->store('', self::DISK);
+        $path = $file->store($directory, self::DISK);
         $url = Storage::disk(self::DISK)->url($path);
 
         return MediaFile::query()->create([
