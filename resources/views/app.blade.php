@@ -1,5 +1,10 @@
+@php
+  $isDashboard = request()->is('dashboard*');
+  $htmlLang = $isDashboard ? str_replace('_', '-', app()->getLocale()) : 'he';
+  $htmlDir = $isDashboard ? 'ltr' : 'rtl';
+@endphp
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="{{ $htmlLang }}" dir="{{ $htmlDir }}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
