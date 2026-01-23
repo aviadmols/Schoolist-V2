@@ -15,6 +15,7 @@ use App\Services\Auth\OtpService;
 use App\Services\Builder\TemplateRenderer;
 use App\Services\Classroom\ClassroomContextService;
 use App\Services\Classroom\ClassroomService;
+use App\Services\Sms\SmsService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -76,7 +77,7 @@ class QlinkController extends Controller
     /**
      * Request an OTP code for the given phone.
      */
-    public function requestOtp(Request $request, OtpService $otpService): JsonResponse
+    public function requestOtp(Request $request, OtpService $otpService, SmsService $smsService): JsonResponse
     {
         $request->validate([
             'phone' => ['required', 'string', 'regex:/^[0-9]{10}$/'],
@@ -86,11 +87,12 @@ class QlinkController extends Controller
         $this->assertValidToken($request->qlink_token);
 
         $code = $otpService->generate($request->phone);
+        $message = $smsService->buildOtpMessage($code);
         $setting = SmsSetting::where('provider', 'sms019')->first();
         $providerRequest = [
             'sender' => $setting?->sender ?? (string) config('services.sms019.sender'),
             'phone_mask' => substr($request->phone, 0, 3) . '****' . substr($request->phone, -3),
-            'message_length' => 0,
+            'message_length' => strlen($message),
         ];
         $providerRequestJson = json_encode($providerRequest, JSON_UNESCAPED_SLASHES) ?: '';
 

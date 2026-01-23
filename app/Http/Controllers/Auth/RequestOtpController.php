@@ -6,6 +6,7 @@ use App\Jobs\SendOtpSmsJob;
 use App\Models\SmsLog;
 use App\Models\SmsSetting;
 use App\Services\Auth\OtpService;
+use App\Services\Sms\SmsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -15,7 +16,7 @@ class RequestOtpController
     /**
      * Request a new OTP code.
      */
-    public function __invoke(Request $request, OtpService $otpService)
+    public function __invoke(Request $request, OtpService $otpService, SmsService $smsService)
     {
         $request->validate([
             'phone' => ['required', 'string', 'regex:/^[0-9]{10}$/'],
@@ -31,11 +32,12 @@ class RequestOtpController
         ]);
 
         $code = $otpService->generate($phone);
+        $message = $smsService->buildOtpMessage($code);
         $setting = SmsSetting::where('provider', 'sms019')->first();
         $providerRequest = [
             'sender' => $setting?->sender ?? (string) config('services.sms019.sender'),
             'phone_mask' => substr($phone, 0, 3) . '****' . substr($phone, -3),
-            'message_length' => 0,
+            'message_length' => strlen($message),
         ];
         $providerRequestJson = json_encode($providerRequest, JSON_UNESCAPED_SLASHES) ?: '';
 
