@@ -8,6 +8,7 @@ use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Section;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -49,31 +50,43 @@ class BuilderTemplateResource extends Resource
                 ->label('Override Enabled'),
             Grid::make(2)
                 ->schema([
-                    Placeholder::make('preview')
-                        ->label('Preview')
-                        ->content(function (?BuilderTemplate $record): HtmlString {
-                            if (!$record) {
-                                return new HtmlString('');
-                            }
+                    Section::make('Preview')
+                        ->schema([
+                            Placeholder::make('preview')
+                                ->label('')
+                                ->content(function (?BuilderTemplate $record): HtmlString {
+                                    if (!$record) {
+                                        return new HtmlString('');
+                                    }
 
-                            $url = route('builder.preview', ['template' => $record, 'version' => 'draft']);
+                                    $url = route('builder.preview', ['template' => $record, 'version' => 'draft']);
 
-                            return new HtmlString(
-                                view('filament.builder-template-preview', ['previewUrl' => $url])->render()
-                            );
-                        })
+                                    return new HtmlString(
+                                        view('filament.builder-template-preview', ['previewUrl' => $url])->render()
+                                    );
+                                }),
+                        ])
                         ->columnSpan(1),
-                    Forms\Components\Textarea::make('draft_html')
-                        ->label('HTML')
-                        ->rows(18)
+                    Section::make('HTML')
+                        ->schema([
+                            Forms\Components\Textarea::make('draft_html')
+                                ->label('')
+                                ->rows(18),
+                        ])
                         ->columnSpan(1),
-                    Forms\Components\Textarea::make('draft_css')
-                        ->label('CSS')
-                        ->rows(18)
+                    Section::make('CSS')
+                        ->schema([
+                            Forms\Components\Textarea::make('draft_css')
+                                ->label('')
+                                ->rows(18),
+                        ])
                         ->columnSpan(1),
-                    Forms\Components\Textarea::make('draft_js')
-                        ->label('JS')
-                        ->rows(18)
+                    Section::make('JS')
+                        ->schema([
+                            Forms\Components\Textarea::make('draft_js')
+                                ->label('')
+                                ->rows(18),
+                        ])
                         ->columnSpan(1),
                 ])
                 ->columnSpanFull(),
