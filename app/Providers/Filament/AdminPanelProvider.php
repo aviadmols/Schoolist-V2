@@ -35,6 +35,10 @@ class AdminPanelProvider extends PanelProvider
                 'primary' => Color::Blue,
             ])
             ->font('Polin', asset('polin.css'), LocalFontProvider::class)
+            ->brandLogo('https://app.schoolist.co.il/storage/media/assets/ACV8xtboYh09FCcYQkpp2uPbUqQDaCe93qcqajxN.svg')
+            ->darkModeBrandLogo('https://app.schoolist.co.il/storage/media/assets/ACV8xtboYh09FCcYQkpp2uPbUqQDaCe93qcqajxN.svg')
+            ->brandLogoHeight('28px')
+            ->brandName('')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([

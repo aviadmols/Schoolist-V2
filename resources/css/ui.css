@@ -108,6 +108,7 @@ body {
   padding: 10px 14px;
   background: var(--color-white);
   color: var(--color-text);
+  font-size: 16px;
   outline: none;
 }
 
