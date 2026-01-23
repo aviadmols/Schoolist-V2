@@ -21,6 +21,7 @@ return [
     'sms019' => [
         'username' => env('SMS_019_USERNAME'),
         'password' => env('SMS_019_PASSWORD'),
+        'token' => env('SMS_019_TOKEN'),
         'sender' => env('SMS_019_SENDER'),
     ],
 

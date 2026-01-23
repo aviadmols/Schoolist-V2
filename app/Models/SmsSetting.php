@@ -11,6 +11,7 @@ class SmsSetting extends Model
         'provider',
         'username',
         'password',
+        'token',
         'sender',
         'otp_message_template',
     ];
@@ -18,5 +19,6 @@ class SmsSetting extends Model
     /** @var array<string, string> */
     protected $casts = [
         'password' => 'encrypted',
+        'token' => 'encrypted',
     ];
 }

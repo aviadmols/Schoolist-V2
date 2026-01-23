@@ -36,6 +36,10 @@ class SmsSettingResource extends Resource
                 ->label('Password')
                 ->password()
                 ->maxLength(255),
+            Forms\Components\TextInput::make('token')
+                ->label('Token')
+                ->password()
+                ->maxLength(255),
             Forms\Components\TextInput::make('sender')
                 ->label('Sender')
                 ->maxLength(255),

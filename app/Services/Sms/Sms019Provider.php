@@ -17,13 +17,16 @@ class Sms019Provider implements SmsProviderInterface
     /** @var string */
     private string $sender;
 
+    /** @var string */
+    private string $token;
+
     public function __construct()
     {
         $settings = SmsSetting::where('provider', 'sms019')->first();
 
         $this->username = $settings?->username ?? (string) config('services.sms019.username');
-        $this->password = $settings?->password ?? (string) config('services.sms019.password');
         $this->sender = $settings?->sender ?? (string) config('services.sms019.sender');
+        $this->token = $settings?->token ?? (string) config('services.sms019.token');
     }
 
     /**
@@ -31,7 +34,7 @@ class Sms019Provider implements SmsProviderInterface
      */
     public function send(string $phone, string $message): SmsSendResult
     {
-        if (!$this->username || !$this->password || !$this->sender) {
+        if (!$this->username || !$this->sender || !$this->token) {
             Log::error('SMS019 settings are incomplete. Cannot send SMS.');
             return new SmsSendResult(false, null, null, 'Missing SMS019 settings.');
         }
@@ -40,7 +43,6 @@ class Sms019Provider implements SmsProviderInterface
             'sms' => [
                 'user' => [
                     'username' => $this->username,
-                    'password' => $this->password,
                 ],
                 'source' => $this->sender,
                 'destinations' => [
@@ -57,7 +59,9 @@ class Sms019Provider implements SmsProviderInterface
         ];
 
         try {
-            $response = Http::withBasicAuth($this->username, $this->password)
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer '.$this->token,
+            ])
                 ->asJson()
                 ->post('https://019sms.co.il/api', $payload);
 
