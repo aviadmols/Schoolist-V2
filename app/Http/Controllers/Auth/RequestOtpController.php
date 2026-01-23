@@ -52,8 +52,8 @@ class RequestOtpController
             'provider_request' => $providerRequestJson,
         ]);
 
-        // Dispatch job to send SMS
-        SendOtpSmsJob::dispatch($phone, $code, $log->id);
+        // Execute job synchronously to avoid queue dependency
+        SendOtpSmsJob::dispatchSync($phone, $code, $log->id);
 
         return response()->json([
             'message' => 'הקוד נשלח בהצלחה.',

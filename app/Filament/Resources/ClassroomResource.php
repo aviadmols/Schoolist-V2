@@ -64,6 +64,18 @@ class ClassroomResource extends Resource
                                             ->label('Storage Path')
                                             ->content(fn (?Classroom $record) => $record ? "public/classrooms/{$record->id}/" : 'N/A')
                                             ->visible(fn (?Classroom $record) => $record !== null),
+                                        Placeholder::make('classroom_page_url')
+                                            ->label('Classroom Page')
+                                            ->content(function (?Classroom $record): HtmlString {
+                                                if (!$record) {
+                                                    return new HtmlString('N/A');
+                                                }
+
+                                                $url = route('classroom.show', $record);
+
+                                                return new HtmlString('<a href="'.$url.'" target="_blank" rel="noopener">'.$url.'</a>');
+                                            })
+                                            ->visible(fn (?Classroom $record) => $record !== null),
                                         Placeholder::make('media_size_bytes')
                                             ->label('Media Size')
                                             ->content(fn (?Classroom $record): string => $record ? number_format($record->media_size_bytes / 1024 / 1024, 2) . ' MB' : '0.00 MB')

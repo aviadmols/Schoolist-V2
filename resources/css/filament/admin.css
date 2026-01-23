@@ -1,0 +1,10 @@
+@import "../fonts.css";
+
+:root {
+  --font-family: var(--font-sans);
+}
+
+body,
+.fi-body {
+  font-family: var(--font-sans);
+}

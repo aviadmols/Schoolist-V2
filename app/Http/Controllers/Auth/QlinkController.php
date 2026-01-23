@@ -107,7 +107,7 @@ class QlinkController extends Controller
             'provider_request' => $providerRequestJson,
         ]);
 
-        SendOtpSmsJob::dispatch($request->phone, $code, $log->id);
+        SendOtpSmsJob::dispatchSync($request->phone, $code, $log->id);
 
         return response()->json(['message' => 'הקוד נשלח בהצלחה.']);
     }

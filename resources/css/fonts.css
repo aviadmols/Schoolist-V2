@@ -1,0 +1,48 @@
+@font-face {
+  font-family: "Polin";
+  src: url("https://app.schoolist.co.il/storage/media/fonts/CS86z5JDYAjrNEcc9pSM71WQD8MPEEvZlu4OUDuA.woff2")
+    format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Polin";
+  src: url("https://app.schoolist.co.il/storage/media/fonts/wU2Wst13aYw7uEY0qLQWDSF7DB8FPNaRQtN0hzwW.woff2")
+    format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Polin";
+  src: url("https://app.schoolist.co.il/storage/media/fonts/p4wod8bwwswfkrySWg9LLS27Yl7skrljpvv25VqB.woff2")
+    format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Polin";
+  src: url("https://app.schoolist.co.il/storage/media/fonts/wlgBj8p9mil9mqwdy95jKfUuAzIwO7YqysatmQr9.woff2")
+    format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "noyland-aaa-bold";
+  src: url("https://app.schoolist.co.il/storage/media/fonts/YwkhfcpuiMjJfYFhjzwbmI9kylzesPoUipkrnYEX")
+    format("opentype");
+  font-weight: bold;
+  font-style: normal;
+}
+
+:root {
+  --font-sans: "Polin", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    Arial, "Noto Sans", "Liberation Sans", sans-serif;
+}
