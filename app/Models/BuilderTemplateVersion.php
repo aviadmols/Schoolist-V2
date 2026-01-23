@@ -21,6 +21,8 @@ class BuilderTemplateVersion extends Model
         'template_id',
         'version_type',
         'html',
+        'css',
+        'js',
         'classroom_id',
         'created_by',
         'created_at',

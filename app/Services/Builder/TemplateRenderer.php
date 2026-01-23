@@ -20,19 +20,13 @@ class TemplateRenderer
      */
     public function renderPublishedByKey(string $key, array $data = []): ?string
     {
-        $template = $this->getGlobalTemplateByKey($key);
+        $parts = $this->renderPublishedPartsByKey($key, $data);
 
-        if (!$template || !$template->is_override_enabled || !$template->published_html) {
+        if (!$parts) {
             return null;
         }
 
-        if (!$this->isTemplateSafe($template->published_html)) {
-            return null;
-        }
-
-        $resolvedHtml = $this->getResolvedHtml($template);
-
-        return Blade::render($resolvedHtml, $this->filterRenderData($data));
+        return $this->buildInlineTemplate($parts['html'], $parts['css'], $parts['js']);
     }
 
     /**
@@ -40,15 +34,55 @@ class TemplateRenderer
      */
     public function renderPreview(BuilderTemplate $template, string $version, array $data = []): string
     {
-        $html = $this->getTemplateHtmlByVersion($template, $version);
+        $parts = $this->renderPreviewParts($template, $version, $data);
 
-        if (!$this->isTemplateSafe($html)) {
-            return '';
+        return $this->buildInlineTemplate($parts['html'], $parts['css'], $parts['js']);
+    }
+
+    /**
+     * Render a published template by key as HTML/CSS/JS parts.
+     *
+     * @return array{html: string, css: string|null, js: string|null}|null
+     */
+    public function renderPublishedPartsByKey(string $key, array $data = []): ?array
+    {
+        $template = $this->getGlobalTemplateByKey($key);
+
+        if (!$template || !$template->is_override_enabled || !$this->hasPublishedContent($template)) {
+            return null;
         }
 
-        $resolvedHtml = $this->resolveIncludeTokens($html, 0);
+        $parts = $this->getTemplatePartsByVersion($template, 'published');
 
-        return Blade::render($resolvedHtml, $this->filterRenderData($data));
+        if (!$this->isTemplateSafe($parts['html'], $parts['css'], $parts['js'])) {
+            return null;
+        }
+
+        $parts['html'] = $this->getResolvedHtml($template);
+
+        return $this->renderTemplateParts($parts, $data);
+    }
+
+    /**
+     * Render a template for preview as HTML/CSS/JS parts.
+     *
+     * @return array{html: string, css: string|null, js: string|null}
+     */
+    public function renderPreviewParts(BuilderTemplate $template, string $version, array $data = []): array
+    {
+        $parts = $this->getTemplatePartsByVersion($template, $version);
+
+        if (!$this->isTemplateSafe($parts['html'], $parts['css'], $parts['js'])) {
+            return [
+                'html' => '',
+                'css' => null,
+                'js' => null,
+            ];
+        }
+
+        $parts['html'] = $this->resolveIncludeTokens($parts['html'], 0);
+
+        return $this->renderTemplateParts($parts, $data);
     }
 
     /**
@@ -67,11 +101,13 @@ class TemplateRenderer
      */
     private function getResolvedHtml(BuilderTemplate $template): string
     {
-        $hash = hash('sha256', $template->published_html ?? '');
+        $hash = hash('sha256', ($template->published_html ?? '').'|'.($template->published_css ?? '').'|'.($template->published_js ?? ''));
         $cacheKey = self::CACHE_KEY_PREFIX.$template->key.'.'.$hash;
 
         return Cache::remember($cacheKey, self::CACHE_TTL_SECONDS, function () use ($template) {
-            return $this->resolveIncludeTokens($template->published_html ?? '', 0);
+            $parts = $this->getTemplatePartsByVersion($template, 'published');
+
+            return $this->resolveIncludeTokens($parts['html'], 0);
         });
     }
 
@@ -99,13 +135,19 @@ class TemplateRenderer
 
             $template = $this->getGlobalTemplateByKey($resolvedKey);
 
-            if (!$template || !$template->published_html || !$template->is_override_enabled) {
+            if (!$template || !$template->is_override_enabled || !$this->hasPublishedContent($template)) {
                 return '';
             }
 
-            $childHtml = $this->resolveIncludeTokens($template->published_html, $depth + 1);
+            $parts = $this->getTemplatePartsByVersion($template, 'published');
 
-            return $childHtml;
+            if (!$this->isTemplateSafe($parts['html'], $parts['css'], $parts['js'])) {
+                return '';
+            }
+
+            $childHtml = $this->resolveIncludeTokens($parts['html'], $depth + 1);
+
+            return $this->buildInlineTemplate($childHtml, $parts['css'], $parts['js']);
         }, $html);
     }
 
@@ -152,7 +194,7 @@ class TemplateRenderer
     /**
      * Check for unsafe PHP execution patterns.
      */
-    public function isTemplateSafe(string $html): bool
+    public function isTemplateSafe(string $html, ?string $css = null, ?string $js = null): bool
     {
         $patterns = [
             '/<\\?php/i',
@@ -160,12 +202,121 @@ class TemplateRenderer
             '/@php\\b/i',
         ];
 
+        $payload = $html.($css ? ' '.$css : '').($js ? ' '.$js : '');
+
         foreach ($patterns as $pattern) {
-            if (preg_match($pattern, $html) === 1) {
+            if (preg_match($pattern, $payload) === 1) {
                 return false;
             }
         }
 
         return true;
+    }
+
+    /**
+     * Get HTML/CSS/JS parts for a template version.
+     *
+     * @return array{html: string, css: string|null, js: string|null}
+     */
+    private function getTemplatePartsByVersion(BuilderTemplate $template, string $version): array
+    {
+        $html = $this->getTemplateHtmlByVersion($template, $version);
+        $css = $version === 'published' ? $template->published_css : $template->draft_css;
+        $js = $version === 'published' ? $template->published_js : $template->draft_js;
+
+        if (!$css && !$js && $this->hasInlineAssets($html)) {
+            $parts = $this->splitTemplateParts($html);
+            $html = $parts['html'];
+            $css = $parts['css'];
+            $js = $parts['js'];
+        }
+
+        return [
+            'html' => $html,
+            'css' => $css,
+            'js' => $js,
+        ];
+    }
+
+    /**
+     * Render parts with Blade and filtered data.
+     *
+     * @param array{html: string, css: string|null, js: string|null} $parts
+     * @return array{html: string, css: string|null, js: string|null}
+     */
+    private function renderTemplateParts(array $parts, array $data): array
+    {
+        $filteredData = $this->filterRenderData($data);
+
+        return [
+            'html' => Blade::render($parts['html'], $filteredData),
+            'css' => $parts['css'] ? Blade::render($parts['css'], $filteredData) : null,
+            'js' => $parts['js'] ? Blade::render($parts['js'], $filteredData) : null,
+        ];
+    }
+
+    /**
+     * Build inline HTML with optional CSS/JS.
+     */
+    private function buildInlineTemplate(string $html, ?string $css, ?string $js): string
+    {
+        $output = '';
+
+        if ($css) {
+            $output .= "<style>\n".$css."\n</style>\n";
+        }
+
+        $output .= $html;
+
+        if ($js) {
+            $output .= "\n<script>\n".$js."\n</script>";
+        }
+
+        return $output;
+    }
+
+    /**
+     * Determine if a template has published content.
+     */
+    private function hasPublishedContent(BuilderTemplate $template): bool
+    {
+        return (bool) (($template->published_html ?? '') || ($template->published_css ?? '') || ($template->published_js ?? ''));
+    }
+
+    /**
+     * Check if HTML has inline style or script tags.
+     */
+    private function hasInlineAssets(string $html): bool
+    {
+        return preg_match('/<(style|script)\\b/i', $html) === 1;
+    }
+
+    /**
+     * Split HTML into HTML/CSS/JS parts.
+     *
+     * @return array{html: string, css: string|null, js: string|null}
+     */
+    private function splitTemplateParts(string $html): array
+    {
+        $css = null;
+        $js = null;
+
+        preg_match_all('/<style\\b[^>]*>(.*?)<\\/style>/is', $html, $cssMatches);
+        if (!empty($cssMatches[1])) {
+            $css = trim(implode("\n\n", $cssMatches[1]));
+            $html = preg_replace('/<style\\b[^>]*>.*?<\\/style>/is', '', $html) ?? $html;
+        }
+
+        preg_match_all('/<script\\b[^>]*>(.*?)<\\/script>/is', $html, $jsMatches);
+        if (!empty($jsMatches[1])) {
+            $js = trim(implode("\n\n", $jsMatches[1]));
+            $html = preg_replace('/<script\\b[^>]*>.*?<\\/script>/is', '', $html) ?? $html;
+        }
+
+        return [
+            'html' => trim($html),
+            'css' => $css ?: null,
+            'js' => $js ?: null,
+        ];
     }
 }

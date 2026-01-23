@@ -6,6 +6,8 @@ use App\Filament\Resources\BuilderTemplateResource\Pages;
 use App\Models\BuilderTemplate;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Components\Grid;
+use Filament\Forms\Components\Placeholder;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -45,34 +47,35 @@ class BuilderTemplateResource extends Resource
                 ->dehydrated(),
             Forms\Components\Toggle::make('is_override_enabled')
                 ->label('Override Enabled'),
-            Forms\Components\Placeholder::make('preview')
-                ->label('Preview')
-                ->content(function (?BuilderTemplate $record): HtmlString {
-                    if (!$record) {
-                        return new HtmlString('');
-                    }
+            Grid::make(2)
+                ->schema([
+                    Placeholder::make('preview')
+                        ->label('Preview')
+                        ->content(function (?BuilderTemplate $record): HtmlString {
+                            if (!$record) {
+                                return new HtmlString('');
+                            }
 
-                    $draftUrl = route('builder.preview', [
-                        'template' => $record,
-                        'version' => 'draft',
-                    ]);
-                    $publishedUrl = route('builder.preview', [
-                        'template' => $record,
-                        'version' => 'published',
-                    ]);
+                            $url = route('builder.preview', ['template' => $record, 'version' => 'draft']);
 
-                    $html = '<div style="display:flex; gap:8px; margin-bottom:8px;">';
-                    $html .= '<a href="'.$draftUrl.'" target="_blank">Open Draft Preview</a>';
-                    $html .= '<a href="'.$publishedUrl.'" target="_blank">Open Published Preview</a>';
-                    $html .= '</div>';
-                    $html .= '<iframe src="'.$draftUrl.'" style="width:100%; min-height:480px; border:1px solid #e5e7eb;"></iframe>';
-
-                    return new HtmlString($html);
-                })
-                ->columnSpanFull(),
-            Forms\Components\Textarea::make('draft_html')
-                ->label('Draft HTML')
-                ->rows(20)
+                            return new HtmlString(
+                                view('filament.builder-template-preview', ['previewUrl' => $url])->render()
+                            );
+                        })
+                        ->columnSpan(1),
+                    Forms\Components\Textarea::make('draft_html')
+                        ->label('HTML')
+                        ->rows(18)
+                        ->columnSpan(1),
+                    Forms\Components\Textarea::make('draft_css')
+                        ->label('CSS')
+                        ->rows(18)
+                        ->columnSpan(1),
+                    Forms\Components\Textarea::make('draft_js')
+                        ->label('JS')
+                        ->rows(18)
+                        ->columnSpan(1),
+                ])
                 ->columnSpanFull(),
             Forms\Components\Textarea::make('mock_data_json')
                 ->label('Mock Data JSON')
@@ -132,8 +135,14 @@ class BuilderTemplateResource extends Resource
                     ->badge(),
                 Tables\Columns\TextColumn::make('published_html')
                     ->label('Status')
-                    ->formatStateUsing(function ($state): string {
-                        return $state ? 'Published' : 'Draft';
+                    ->formatStateUsing(function ($state, BuilderTemplate $record): string {
+                        $hasPublished = (bool) (
+                            $record->published_html
+                            || $record->published_css
+                            || $record->published_js
+                        );
+
+                        return $hasPublished ? 'Published' : 'Draft';
                     })
                     ->badge(),
                 Tables\Columns\IconColumn::make('is_override_enabled')

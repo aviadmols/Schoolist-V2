@@ -31,10 +31,14 @@ class SmsLogResource extends Resource
                 Tables\Columns\TextColumn::make('classroom_id')->label('Classroom'),
                 Tables\Columns\TextColumn::make('request_id')->label('Request ID'),
                 Tables\Columns\TextColumn::make('error_message')->label('Error'),
+                Tables\Columns\TextColumn::make('provider_request')
+                    ->label('Provider Request')
+                    ->limit(80)
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('provider_response')
                     ->label('Provider Response')
                     ->limit(80)
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('created_at')->label('Created')->dateTime(),
             ])
             ->actions([])

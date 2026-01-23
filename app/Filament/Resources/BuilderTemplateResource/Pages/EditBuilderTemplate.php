@@ -37,7 +37,11 @@ class EditBuilderTemplate extends EditRecord
                 ->requiresConfirmation()
                 ->action(function (): void {
                     $manager = app(TemplateManager::class);
-                    $manager->assertTemplateIsSafe((string) ($this->record->draft_html ?? ''));
+                    $manager->assertTemplateIsSafe(
+                        (string) ($this->record->draft_html ?? ''),
+                        $this->record->draft_css,
+                        $this->record->draft_js
+                    );
                     $manager->publishTemplate($this->record);
                 }),
             Actions\Action::make('revert')
@@ -81,7 +85,11 @@ class EditBuilderTemplate extends EditRecord
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        app(TemplateManager::class)->assertTemplateIsSafe((string) ($data['draft_html'] ?? ''));
+        app(TemplateManager::class)->assertTemplateIsSafe(
+            (string) ($data['draft_html'] ?? ''),
+            $data['draft_css'] ?? null,
+            $data['draft_js'] ?? null
+        );
 
         $data['updated_by'] = auth()->id();
 

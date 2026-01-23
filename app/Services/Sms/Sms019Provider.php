@@ -40,6 +40,7 @@ class Sms019Provider implements SmsProviderInterface
             'sms' => [
                 'user' => [
                     'username' => $this->username,
+                    'password' => $this->password,
                 ],
                 'source' => $this->sender,
                 'destinations' => [
@@ -58,12 +59,9 @@ class Sms019Provider implements SmsProviderInterface
         ];
 
         try {
-            $authorization = base64_encode($this->username . ':' . $this->password);
-
-            $response = Http::withHeaders([
-                'Authorization' => 'Basic ' . $authorization,
-                'Content-Type' => 'application/json',
-            ])->post('https://019sms.co.il/api', $payload);
+            $response = Http::withBasicAuth($this->username, $this->password)
+                ->asJson()
+                ->post('https://019sms.co.il/api', $payload);
 
             return new SmsSendResult(
                 $response->successful(),

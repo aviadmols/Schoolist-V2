@@ -16,6 +16,7 @@ class SmsLog extends Model
         'user_id',
         'classroom_id',
         'error_message',
+        'provider_request',
         'provider_response',
     ];
 

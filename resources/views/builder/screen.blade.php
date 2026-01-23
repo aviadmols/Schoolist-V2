@@ -7,8 +7,18 @@
     @if ($themeCssUrl = builder_theme_css_url())
       <link rel="stylesheet" href="{{ $themeCssUrl }}">
     @endif
+    @if (!empty($css))
+      <style>
+        {!! $css !!}
+      </style>
+    @endif
   </head>
   <body>
     {!! $html !!}
+    @if (!empty($js))
+      <script>
+        {!! $js !!}
+      </script>
+    @endif
   </body>
 </html>

@@ -13,15 +13,17 @@ class GetLoginPageController
      */
     public function __invoke(TemplateRenderer $renderer): Response
     {
-        $overrideHtml = $renderer->renderPublishedByKey('auth.login', [
+        $overrideParts = $renderer->renderPublishedPartsByKey('auth.login', [
             'user' => auth()->user(),
             'locale' => app()->getLocale(),
             'page' => [],
         ]);
 
-        if ($overrideHtml) {
+        if ($overrideParts) {
             return response()->view('builder.screen', [
-                'html' => $overrideHtml,
+                'html' => $overrideParts['html'],
+                'css' => $overrideParts['css'],
+                'js' => $overrideParts['js'],
             ]);
         }
 

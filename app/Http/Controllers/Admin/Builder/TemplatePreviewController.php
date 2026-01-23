@@ -26,10 +26,12 @@ class TemplatePreviewController
             'page' => [],
         ], $mockData);
 
-        $html = $renderer->renderPreview($template, $version, $data);
+        $parts = $renderer->renderPreviewParts($template, $version, $data);
 
         return view('builder.screen', [
-            'html' => $html,
+            'html' => $parts['html'],
+            'css' => $parts['css'],
+            'js' => $parts['js'],
         ]);
     }
 

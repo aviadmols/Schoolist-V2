@@ -21,6 +21,14 @@ class SmsService
      */
     public function send(string $phone, string $message): bool
     {
+        $setting = SmsSetting::where('provider', 'sms019')->first();
+        $providerRequest = [
+            'sender' => $setting?->sender ?? (string) config('services.sms019.sender'),
+            'phone_mask' => $this->maskPhone($phone),
+            'message_length' => strlen($message),
+        ];
+        $providerRequestJson = json_encode($providerRequest, JSON_UNESCAPED_SLASHES) ?: '';
+
         $log = SmsLog::create([
             'provider' => 'sms019',
             'phone_mask' => $this->maskPhone($phone),
@@ -29,6 +37,7 @@ class SmsService
             'user_id' => auth()->id(),
             'classroom_id' => Request::get('current_classroom')?->id,
             'error_message' => null,
+            'provider_request' => $providerRequestJson,
         ]);
 
         $result = $this->provider->send($phone, $message);
@@ -48,9 +57,18 @@ class SmsService
      */
     public function sendWithLog(SmsLog $log, string $phone, string $message): bool
     {
+        $setting = SmsSetting::where('provider', 'sms019')->first();
+        $providerRequest = [
+            'sender' => $setting?->sender ?? (string) config('services.sms019.sender'),
+            'phone_mask' => $this->maskPhone($phone),
+            'message_length' => strlen($message),
+        ];
+        $providerRequestJson = json_encode($providerRequest, JSON_UNESCAPED_SLASHES) ?: '';
+
         $log->update([
             'status' => 'attempt',
             'error_message' => null,
+            'provider_request' => $providerRequestJson,
         ]);
 
         $result = $this->provider->send($phone, $message);

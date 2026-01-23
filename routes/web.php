@@ -65,16 +65,18 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
         'timetable_image' => null,
     ];
 
-    $overrideHtml = app(TemplateRenderer::class)->renderPublishedByKey('classroom.page', [
+    $overrideParts = app(TemplateRenderer::class)->renderPublishedPartsByKey('classroom.page', [
         'user' => auth()->user(),
         'classroom' => $classroom,
         'locale' => app()->getLocale(),
         'page' => $pageData,
     ]);
 
-    if ($overrideHtml) {
+    if ($overrideParts) {
         return response()->view('builder.screen', [
-            'html' => $overrideHtml,
+            'html' => $overrideParts['html'],
+            'css' => $overrideParts['css'],
+            'js' => $overrideParts['js'],
         ]);
     }
 
