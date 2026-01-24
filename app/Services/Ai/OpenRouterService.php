@@ -2,6 +2,7 @@
 
 namespace App\Services\Ai;
 
+use App\Services\Audit\AuditService;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
@@ -10,11 +11,20 @@ class OpenRouterService
     /** @var string */
     private const BASE_URL = 'https://openrouter.ai/api/v1';
 
+    /** @var string */
+    private const AUDIT_EVENT = 'openrouter_request';
+
     /** @var int */
     private const REQUEST_TIMEOUT_SECONDS = 120;
 
     /** @var int */
     private const ERROR_BODY_LIMIT = 500;
+
+    /** @var int */
+    private const PROMPT_PREVIEW_LIMIT = 2000;
+
+    /** @var int */
+    private const RESPONSE_PREVIEW_LIMIT = 2000;
 
     /** @var string|null */
     private ?string $lastError = null;
@@ -49,9 +59,11 @@ class OpenRouterService
         string $model,
         string $prompt,
         string $imageMime,
-        string $imageBase64
+        string $imageBase64,
+        ?int $classroomId = null
     ): ?string {
         $this->clearLastError();
+        $requestPayload = $this->buildRequestLogPayload('timetable_extraction', $model, $prompt, $imageMime, $imageBase64);
 
         $payload = [
             'model' => $model,
@@ -70,10 +82,14 @@ class OpenRouterService
             $response = $this->sendRequest($token, 'POST', self::BASE_URL.'/chat/completions', $payload);
         } catch (\Throwable $exception) {
             $this->lastError = $exception->getMessage();
+            $this->recordAuditLog($requestPayload, $this->buildResponseLogPayload(null, null, $this->lastError), $classroomId);
             return null;
         }
 
-        return $this->resolveResponseContent($response);
+        $content = $this->resolveResponseContent($response);
+        $this->recordAuditLog($requestPayload, $this->buildResponseLogPayload($response, $content, $this->lastError), $classroomId);
+
+        return $content;
     }
 
     /**
@@ -81,9 +97,10 @@ class OpenRouterService
      *
      * @return string|null
      */
-    public function requestTemplateUpdate(string $token, string $model, string $prompt): ?string
+    public function requestTemplateUpdate(string $token, string $model, string $prompt, ?int $classroomId = null): ?string
     {
         $this->clearLastError();
+        $requestPayload = $this->buildRequestLogPayload('template_update', $model, $prompt, null, null);
 
         $payload = [
             'model' => $model,
@@ -99,10 +116,14 @@ class OpenRouterService
             $response = $this->sendRequest($token, 'POST', self::BASE_URL.'/chat/completions', $payload);
         } catch (\Throwable $exception) {
             $this->lastError = $exception->getMessage();
+            $this->recordAuditLog($requestPayload, $this->buildResponseLogPayload(null, null, $this->lastError), $classroomId);
             return null;
         }
 
-        return $this->resolveResponseContent($response);
+        $content = $this->resolveResponseContent($response);
+        $this->recordAuditLog($requestPayload, $this->buildResponseLogPayload($response, $content, $this->lastError), $classroomId);
+
+        return $content;
     }
 
     /**
@@ -115,9 +136,11 @@ class OpenRouterService
         string $model,
         string $prompt,
         ?string $imageMime = null,
-        ?string $imageBase64 = null
+        ?string $imageBase64 = null,
+        ?int $classroomId = null
     ): ?string {
         $this->clearLastError();
+        $requestPayload = $this->buildRequestLogPayload('content_analysis', $model, $prompt, $imageMime, $imageBase64);
 
         $content = [
             ['type' => 'text', 'text' => $prompt],
@@ -141,10 +164,14 @@ class OpenRouterService
             $response = $this->sendRequest($token, 'POST', self::BASE_URL.'/chat/completions', $payload);
         } catch (\Throwable $exception) {
             $this->lastError = $exception->getMessage();
+            $this->recordAuditLog($requestPayload, $this->buildResponseLogPayload(null, null, $this->lastError), $classroomId);
             return null;
         }
 
-        return $this->resolveResponseContent($response);
+        $content = $this->resolveResponseContent($response);
+        $this->recordAuditLog($requestPayload, $this->buildResponseLogPayload($response, $content, $this->lastError), $classroomId);
+
+        return $content;
     }
 
     /**
@@ -161,6 +188,65 @@ class OpenRouterService
         }
 
         return $client->post($url, $payload);
+    }
+
+    /**
+     * Build a request payload for audit logging.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildRequestLogPayload(
+        string $type,
+        string $model,
+        string $prompt,
+        ?string $imageMime,
+        ?string $imageBase64
+    ): array {
+        $promptText = trim($prompt);
+
+        return [
+            'type' => $type,
+            'model' => $model,
+            'prompt_length' => strlen($promptText),
+            'prompt_preview' => $this->truncateText($promptText, self::PROMPT_PREVIEW_LIMIT),
+            'has_image' => $imageMime !== null && $imageBase64 !== null,
+            'image_mime' => $imageMime,
+            'image_size' => $imageBase64 ? strlen($imageBase64) : null,
+        ];
+    }
+
+    /**
+     * Build a response payload for audit logging.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildResponseLogPayload(?Response $response, ?string $content, ?string $error): array
+    {
+        $contentText = $content ? trim($content) : '';
+
+        return [
+            'status' => $response ? $response->status() : null,
+            'content_length' => $contentText !== '' ? strlen($contentText) : null,
+            'content_preview' => $contentText !== '' ? $this->truncateText($contentText, self::RESPONSE_PREVIEW_LIMIT) : null,
+            'error' => $error,
+        ];
+    }
+
+    /**
+     * Record the request/response in the audit log.
+     */
+    private function recordAuditLog(array $requestPayload, array $responsePayload, ?int $classroomId): void
+    {
+        app(AuditService::class)->log(
+            self::AUDIT_EVENT,
+            null,
+            null,
+            [
+                'request' => $requestPayload,
+                'response' => $responsePayload,
+            ],
+            $classroomId
+        );
     }
 
     /**
@@ -209,5 +295,17 @@ class OpenRouterService
     private function clearLastError(): void
     {
         $this->lastError = null;
+    }
+
+    /**
+     * Truncate a long text to the given limit.
+     */
+    private function truncateText(string $text, int $limit): string
+    {
+        if (mb_strlen($text) <= $limit) {
+            return $text;
+        }
+
+        return mb_substr($text, 0, $limit);
     }
 }

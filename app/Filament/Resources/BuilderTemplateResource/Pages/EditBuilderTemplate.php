@@ -133,7 +133,7 @@ class EditBuilderTemplate extends EditRecord
             return;
         }
 
-        $setting = $this->getAiSettingsForClassroom($classroomId);
+        $setting = $this->getGlobalAiSettings();
         if (!$setting || !$setting->token || !$setting->model || !$setting->builder_template_prompt) {
             Notification::make()
                 ->title('OpenRouter settings are missing')
@@ -152,7 +152,7 @@ class EditBuilderTemplate extends EditRecord
         }
 
         $prompt = $this->buildTemplatePrompt($setting->builder_template_prompt, $schemaFields, $html);
-        $responseHtml = $service->requestTemplateUpdate($setting->token, $setting->model, $prompt);
+        $responseHtml = $service->requestTemplateUpdate($setting->token, $setting->model, $prompt, $classroomId);
         if (!$responseHtml) {
             Notification::make()
                 ->title('OpenRouter returned an empty response')
@@ -226,13 +226,13 @@ class EditBuilderTemplate extends EditRecord
     }
 
     /**
-     * Get AI settings for a classroom.
+     * Get global AI settings.
      */
-    protected function getAiSettingsForClassroom(int $classroomId): ?AiSetting
+    protected function getGlobalAiSettings(): ?AiSetting
     {
         return AiSetting::query()
-            ->where('classroom_id', $classroomId)
             ->where('provider', 'openrouter')
+            ->whereNull('classroom_id')
             ->first();
     }
 }

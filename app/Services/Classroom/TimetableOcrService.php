@@ -68,7 +68,8 @@ class TimetableOcrService
             (string) $setting->model,
             (string) $setting->timetable_prompt,
             $imageMime,
-            $imageBase64
+            $imageBase64,
+            $classroom->id
         );
 
         if (!$responseText) {

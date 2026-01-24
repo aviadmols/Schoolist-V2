@@ -98,7 +98,8 @@ class EditClassroom extends EditRecord
             (string) $setting->content_analyzer_model,
             $prompt,
             $imageMime,
-            $imageBase64
+            $imageBase64,
+            $this->record?->id
         );
 
         if (!$response) {
