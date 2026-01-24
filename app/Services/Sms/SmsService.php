@@ -91,7 +91,7 @@ class SmsService
         $setting = SmsSetting::where('provider', 'sms019')->first();
         $template = $setting?->otp_message_template ?: 'קוד האימות שלך הוא: {{code}}';
         $message = str_replace('{{code}}', $code, $template);
-        $message = str_replace('<#>', '', $message);
+        $message = preg_replace('/\s*<\#>\s*/', ' ', $message) ?? $message;
         $message = trim($message);
 
         $host = $this->getOtpSmsHost();

@@ -18,7 +18,7 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick } from 'vue';
+import { ref, watch, nextTick, onMounted } from 'vue';
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -29,17 +29,26 @@ const emit = defineEmits(['update:modelValue']);
 const digits = ref(['', '', '', '']);
 const inputRefs = ref([]);
 
+/**
+ * Store input refs.
+ */
 function setInputRef(el, idx) {
   if (el) {
     inputRefs.value[idx] = el;
   }
 }
 
+/**
+ * Emit concatenated code.
+ */
 function updateModelValue() {
   const code = digits.value.join('');
   emit('update:modelValue', code);
 }
 
+/**
+ * Handle paste into OTP inputs.
+ */
 function handlePaste(e, idx) {
   const text = (e.clipboardData || window.clipboardData).getData('text') || '';
   const numericText = text.replace(/\D/g, '').slice(0, 4);
@@ -60,6 +69,9 @@ function handlePaste(e, idx) {
   updateModelValue();
 }
 
+/**
+ * Handle single digit input.
+ */
 function handleInput(e, idx) {
   const value = (e.target.value || '').replace(/\D/g, '').slice(0, 1);
   digits.value[idx] = value;
@@ -73,12 +85,18 @@ function handleInput(e, idx) {
   }
 }
 
+/**
+ * Handle backspace navigation.
+ */
 function handleKeydown(e, idx) {
   if (e.key === 'Backspace' && !digits.value[idx] && inputRefs.value[idx - 1]) {
     inputRefs.value[idx - 1].focus();
   }
 }
 
+/**
+ * Sync model value to inputs.
+ */
 watch(() => props.modelValue, (newValue) => {
   if (newValue !== digits.value.join('')) {
     const newDigits = newValue.replace(/\D/g, '').slice(0, 4).split('');
@@ -88,6 +106,19 @@ watch(() => props.modelValue, (newValue) => {
     digits.value = newDigits;
   }
 }, { immediate: true });
+
+/**
+ * Focus the first input on mount.
+ */
+function focusFirstInput() {
+  nextTick(() => {
+    inputRefs.value[0]?.focus();
+  });
+}
+
+onMounted(() => {
+  focusFirstInput();
+});
 </script>
 
 <style scoped>
