@@ -95,12 +95,14 @@ watch(() => props.modelValue, (newValue) => {
   display: flex;
   gap: 12px;
   justify-content: center;
+  flex-direction: row-reverse;
 }
 
 .otp-input {
   width: 56px;
   height: 56px;
   text-align: center;
+  direction: ltr;
   font-size: 24px;
   font-weight: 600;
   border: 2px solid #e2e8f0;

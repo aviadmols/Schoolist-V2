@@ -91,8 +91,18 @@ class SmsService
         $setting = SmsSetting::where('provider', 'sms019')->first();
         $template = $setting?->otp_message_template ?: 'קוד האימות שלך הוא: {{code}}';
         $message = str_replace('{{code}}', $code, $template);
+        $message = str_replace('<#>', '', $message);
+        $message = trim($message);
 
-        return trim($message);
+        $host = $this->getOtpSmsHost();
+        if ($host !== '') {
+            $suffix = '@'.$host.' #'.$code;
+            if (!str_contains($message, $suffix)) {
+                $message = rtrim($message)."\n".$suffix;
+            }
+        }
+
+        return $message;
     }
 
     /**
@@ -105,6 +115,17 @@ class SmsService
         }
 
         return substr($phone, 0, 3) . '****' . substr($phone, -3);
+    }
+
+    /**
+     * Resolve the host for OTP SMS.
+     */
+    private function getOtpSmsHost(): string
+    {
+        $appUrl = (string) config('app.url');
+        $host = parse_url($appUrl, PHP_URL_HOST);
+
+        return $host ? (string) $host : '';
     }
 
     /**
