@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Hash;
 class OtpService
 {
     /** @var int */
-    private const CODE_LENGTH = 6;
+    private const CODE_LENGTH = 4;
 
     /** @var int */
     private const EXPIRES_IN_MINUTES = 5;

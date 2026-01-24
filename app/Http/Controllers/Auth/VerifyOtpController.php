@@ -18,7 +18,7 @@ class VerifyOtpController
     {
         $request->validate([
             'phone' => ['required', 'string', 'regex:/^[0-9]{10}$/'],
-            'code' => ['required', 'string', 'size:6'],
+            'code' => ['required', 'string', 'size:4'],
         ]);
 
         $phone = $request->phone;

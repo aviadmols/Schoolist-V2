@@ -13,7 +13,7 @@
       </UiField>
 
       <UiField v-if="step === 'code'" label="קוד אימות">
-        <UiInput v-model="code" type="text" placeholder="123456" autocomplete="one-time-code" inputmode="numeric" maxlength="6" />
+        <OtpInput v-model="code" />
       </UiField>
 
       <div v-if="step === 'register'" class="stack">
@@ -64,8 +64,6 @@ const email = ref('');
 const joinCode = ref('');
 const error = ref(null);
 const isSubmitting = ref(false);
-const isOtpListening = ref(false);
-const otpAbortController = ref(null);
 
 const submitLabel = computed(() => {
   if (step.value === 'phone') return 'שלח קוד אימות';
@@ -118,58 +116,6 @@ async function postJson(url, payload) {
 }
 
 /**
- * Check if the browser supports Web OTP.
- *
- * @returns {boolean}
- */
-function supportsWebOtp() {
-  return typeof window !== 'undefined' && 'OTPCredential' in window && window.isSecureContext;
-}
-
-/**
- * Start listening for an SMS OTP code.
- *
- * @returns {Promise<void>}
- */
-async function startOtpListener() {
-  if (!supportsWebOtp() || isOtpListening.value || step.value !== 'code') return;
-
-  isOtpListening.value = true;
-  const controller = new AbortController();
-  otpAbortController.value = controller;
-
-  try {
-    const otp = await navigator.credentials.get({
-      otp: { transport: ['sms'] },
-      signal: controller.signal,
-    });
-
-    if (otp?.code) {
-      code.value = otp.code;
-      handleSubmit();
-    }
-  } catch (_) {
-    // Ignore errors or aborts.
-  } finally {
-    isOtpListening.value = false;
-    otpAbortController.value = null;
-  }
-}
-
-/**
- * Stop listening for OTP codes.
- *
- * @returns {void}
- */
-function stopOtpListener() {
-  if (otpAbortController.value) {
-    otpAbortController.value.abort();
-    otpAbortController.value = null;
-  }
-  isOtpListening.value = false;
-}
-
-/**
  * Attempt auto-login using local token.
  *
  * @returns {Promise<void>}
@@ -209,7 +155,6 @@ async function handleSubmit() {
         qlink_token: props.token,
       });
       step.value = 'code';
-      startOtpListener();
       return;
     }
 
@@ -258,14 +203,5 @@ async function handleSubmit() {
 
 onMounted(() => {
   tryAutoLogin();
-});
-
-watch(step, (next) => {
-  if (next === 'code') {
-    startOtpListener();
-    return;
-  }
-
-  stopOtpListener();
 });
 </script>

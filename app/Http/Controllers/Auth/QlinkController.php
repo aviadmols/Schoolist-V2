@@ -119,7 +119,7 @@ class QlinkController extends Controller
     {
         $request->validate([
             'phone' => ['required', 'string', 'regex:/^[0-9]{10}$/'],
-            'code' => ['required', 'string', 'size:6'],
+            'code' => ['required', 'string', 'size:4'],
             'qlink_token' => ['required', 'string'],
         ]);
 

@@ -218,8 +218,15 @@ class TemplateManager
   .logo-image { height: 20px; width: auto; display: block; }
 </style>
 
-<div class="mobile-wrapper">
+<div class="mobile-wrapper" dir="rtl">
   <header class="header">
+    <div class="header-info">
+      <div class="class-badge">{{ $page['classroom']['grade_level'] ?? '' }}{{ $page['classroom']['grade_number'] ?? '' }}</div>
+      <div class="school-text">
+        <span class="school-year">{{ $page['school_year'] ?? '' }}</span>
+        <span class="school-name">{{ $page['classroom']['school_name'] ?? ($page['classroom']['name'] ?? '') }}</span>
+      </div>
+    </div>
     <div class="header-actions">
       <button type="button" class="icon-btn" data-popup-target="popup-contacts">
         <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
@@ -227,14 +234,6 @@ class TemplateManager
       <button type="button" class="icon-btn" data-popup-target="popup-invite">
         <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
       </button>
-    </div>
-
-    <div class="header-info">
-      <div class="school-text">
-        <span class="school-year">{{ $page['school_year'] ?? '' }}</span>
-        <span class="school-name">{{ $page['classroom']['school_name'] ?? ($page['classroom']['name'] ?? '') }}</span>
-      </div>
-      <div class="class-badge">{{ $page['classroom']['grade_level'] ?? '' }}{{ $page['classroom']['grade_number'] ?? '' }}</div>
     </div>
   </header>
 
@@ -400,15 +399,11 @@ class TemplateManager
   </div>
 
   <footer class="footer">
+    <div class="logo-text">schoolist</div>
     <div class="share-btn" data-popup-target="popup-links">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
       שיתוף הדף
     </div>
-    <img
-      class="logo-image"
-      src="https://app.schoolist.co.il/storage/media/assets/ACV8xtboYh09FCcYQkpp2uPbUqQDaCe93qcqajxN.svg"
-      alt="Schoolist logo"
-    >
   </footer>
 </div>
 

@@ -13,7 +13,7 @@
       </UiField>
 
       <UiField v-if="step === 'code'" label="קוד אימות">
-        <UiInput v-model="code" type="text" placeholder="123456" autocomplete="one-time-code" inputmode="numeric" maxlength="6" />
+        <OtpInput v-model="code" />
       </UiField>
 
       <div v-if="step === 'register'" class="stack">
@@ -36,11 +36,12 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import AuthLayout from '../../layouts/AuthLayout.vue';
 import UiButton from '../../components/ui/UiButton.vue';
 import UiField from '../../components/ui/UiField.vue';
 import UiInput from '../../components/ui/UiInput.vue';
+import OtpInput from '../../components/ui/OtpInput.vue';
 
 /**
  * OTP login page.
@@ -55,8 +56,6 @@ const lastName = ref('');
 const email = ref('');
 const error = ref(null);
 const isSubmitting = ref(false);
-const isOtpListening = ref(false);
-const otpAbortController = ref(null);
 
 const submitLabel = computed(() => {
   if (step.value === 'phone') return 'שלח קוד אימות';
@@ -194,13 +193,4 @@ function handleSubmit() {
     .catch(() => { error.value = 'הרישום נכשל.'; })
     .finally(() => { isSubmitting.value = false; });
 }
-
-watch(step, (next) => {
-  if (next === 'code') {
-    startOtpListener();
-    return;
-  }
-
-  stopOtpListener();
-});
 </script>

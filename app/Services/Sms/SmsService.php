@@ -92,7 +92,7 @@ class SmsService
         $template = $setting?->otp_message_template ?: 'קוד האימות שלך הוא: {{code}}';
         $message = str_replace('{{code}}', $code, $template);
 
-        return $this->formatOtpMessageForAutoFill($message);
+        return trim($message);
     }
 
     /**
@@ -160,39 +160,4 @@ class SmsService
         return substr($body, 0, $maxLength).'...';
     }
 
-    /**
-     * Format OTP message to support SMS auto-fill.
-     */
-    private function formatOtpMessageForAutoFill(string $message): string
-    {
-        $trimmed = trim($message);
-        $trimmed = preg_replace('/^<#>\\s*/', '', $trimmed) ?? $trimmed;
-        $trimmed = preg_replace('/\\s*@[^\\s]+$/', '', $trimmed) ?? $trimmed;
-        $prefix = '<#> ';
-        $host = $this->getOtpSmsHost();
-
-        if ($host === '') {
-            return str_starts_with($trimmed, '<#>') ? $trimmed : $prefix.$trimmed;
-        }
-
-        $suffix = "\n@".$host;
-        $withPrefix = $prefix.$trimmed;
-
-        if (str_contains($withPrefix, '@'.$host)) {
-            return $withPrefix;
-        }
-
-        return $withPrefix.$suffix;
-    }
-
-    /**
-     * Resolve the host for SMS auto-fill.
-     */
-    private function getOtpSmsHost(): string
-    {
-        $appUrl = (string) config('app.url');
-        $host = parse_url($appUrl, PHP_URL_HOST);
-
-        return $host ? (string) $host : '';
-    }
 }
