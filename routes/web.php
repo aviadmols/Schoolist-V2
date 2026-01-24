@@ -14,6 +14,7 @@ use App\Services\Builder\TemplateRenderer;
 use App\Services\Classroom\HolidayService;
 use App\Services\Classroom\TimetableService;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Storage;
 
 Route::get('/', GetLandingPageController::class)->name('landing');
 
@@ -56,12 +57,24 @@ Route::post('/qlink/auto', [QlinkController::class, 'autoLogin'])->name('qlink.a
 
 Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
     $classroom->load(['city', 'school']);
+    $user = auth()->user();
     $today = Carbon::now($classroom->timezone);
     $selectedDay = (int) request()->query('day', $today->dayOfWeek);
     $timetableService = app(TimetableService::class);
     $announcementService = app(AnnouncementFeedService::class);
     $holidayService = app(HolidayService::class);
     $holidays = $holidayService->getUpcomingHolidays($classroom);
+    $dayLabels = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
+    $dayNames = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+    $canManage = false;
+
+    if ($user) {
+        $canManage = $user->role === 'site_admin'
+            || $classroom->users()
+                ->where('users.id', $user->id)
+                ->wherePivotIn('role', ['owner', 'admin'])
+                ->exists();
+    }
 
     $mapHolidays = function (Carbon $from, Carbon $to) use ($holidays): array {
         return $holidays
@@ -82,7 +95,20 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
 
     $announcementFeed = $announcementService->getActiveFeed($classroom);
     $eventAnnouncements = $announcementFeed->filter(fn (array $announcement) => ($announcement['type'] ?? '') === 'event');
-    $announcements = $announcementFeed->reject(fn (array $announcement) => ($announcement['type'] ?? '') === 'event');
+    $announcements = $announcementFeed
+        ->filter(function (array $announcement) use ($today, $classroom): bool {
+            if (($announcement['type'] ?? '') !== 'message') {
+                return false;
+            }
+
+            if (empty($announcement['occurs_on_date'])) {
+                return false;
+            }
+
+            $date = Carbon::parse($announcement['occurs_on_date'], $classroom->timezone);
+
+            return $date->isSameDay($today) || $date->greaterThan($today);
+        });
     $weekStart = $today->copy()->startOfWeek();
     $weekEnd = $today->copy()->endOfWeek();
 
@@ -149,7 +175,8 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
             'school_name' => $classroom->school?->name,
         ],
         'selected_day' => $selectedDay,
-        'day_labels' => ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'],
+        'day_labels' => $dayLabels,
+        'day_names' => $dayNames,
         'timetable' => $timetableService->getWeeklyTimetable($classroom),
         'announcements' => $announcements->values()->all(),
         'events_today' => array_merge($mapHolidays($today, $today), $eventsToday),
@@ -158,10 +185,38 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
             ->orderBy('sort_order', 'asc')
             ->get()
             ->map(function (ClassLink $link): array {
+                $fileUrl = $link->file_path ? Storage::disk('public')->url($link->file_path) : null;
+                $linkUrl = $link->url ?: $fileUrl;
+
                 return [
                     'title' => $link->title,
                     'url' => $link->url,
+                    'link_url' => $linkUrl,
+                    'file_url' => $fileUrl,
+                    'category' => $link->category,
                     'icon' => $link->icon,
+                ];
+            })
+            ->values()
+            ->all(),
+        'children' => $classroom->children()
+            ->orderBy('name', 'asc')
+            ->get()
+            ->map(function (\App\Models\Child $child): array {
+                return [
+                    'name' => $child->name,
+                    'birth_date' => $child->birth_date?->format('d.m.Y'),
+                ];
+            })
+            ->values()
+            ->all(),
+        'holidays' => $holidays
+            ->map(function ($holiday): array {
+                return [
+                    'name' => $holiday->name,
+                    'start_date' => $holiday->start_date?->format('d.m.Y'),
+                    'end_date' => $holiday->end_date?->format('d.m.Y'),
+                    'description' => $holiday->description,
                 ];
             })
             ->values()
@@ -181,6 +236,9 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
             ->all(),
         'weather_text' => '16-20° - מזג אוויר נוח.',
         'timetable_image' => $timetableService->getTimetableImageUrl($classroom),
+        'can_manage' => $canManage,
+        'admin_edit_url' => $canManage ? url("/admin/classrooms/{$classroom->id}/edit") : null,
+        'share_link' => url("/class/{$classroom->id}"),
     ];
 
     $overrideParts = app(TemplateRenderer::class)->renderPublishedPartsByKey('classroom.page', [

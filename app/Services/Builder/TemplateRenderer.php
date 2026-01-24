@@ -328,10 +328,6 @@ class TemplateRenderer
             return $parts;
         }
 
-        if (str_contains($parts['html'], 'day-tabs-container')) {
-            return $parts;
-        }
-
         $tabsHtml = <<<'HTML'
 <div class="day-tabs-container">
   @foreach (($page['day_labels'] ?? ['א','ב','ג','ד','ה','ו','ש']) as $dayIndex => $dayLabel)
@@ -343,13 +339,18 @@ class TemplateRenderer
 HTML;
 
         $tabsCss = <<<'CSS'
-.day-tabs-container { display: flex; gap: 8px; overflow-x: auto; padding: 12px 16px; }
-.day-tab { border: none; background: #f1f5f9; color: #0f172a; border-radius: 999px; padding: 6px 10px; font-size: 12px; }
+.day-tabs-container { display: flex !important; gap: 8px; overflow-x: auto; padding: 12px 16px; }
+.day-tab { display: inline-flex; align-items: center; justify-content: center; border: none; background: #f1f5f9; color: #0f172a; border-radius: 999px; padding: 6px 10px; font-size: 12px; }
 .day-tab.active { background: #e0f2fe; color: #2563eb; font-weight: 700; }
 CSS;
 
-        $parts['html'] = $tabsHtml."\n".$parts['html'];
-        $parts['css'] = $parts['css'] ? ($tabsCss."\n".$parts['css']) : $tabsCss;
+        if (!str_contains($parts['html'], 'day-tabs-container')) {
+            $parts['html'] = $tabsHtml."\n".$parts['html'];
+        }
+
+        if (!$parts['css'] || !str_contains($parts['css'], '.day-tabs-container')) {
+            $parts['css'] = $parts['css'] ? ($tabsCss."\n".$parts['css']) : $tabsCss;
+        }
 
         return $parts;
     }

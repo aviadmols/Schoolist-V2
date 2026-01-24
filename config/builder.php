@@ -28,6 +28,22 @@ return [
             'title' => 'Useful Links',
         ],
         [
+            'key' => 'whatsapp',
+            'title' => 'Group WhatsApp',
+        ],
+        [
+            'key' => 'important-links',
+            'title' => 'Important Links',
+        ],
+        [
+            'key' => 'holidays',
+            'title' => 'Holidays',
+        ],
+        [
+            'key' => 'children',
+            'title' => 'Children',
+        ],
+        [
             'key' => 'contacts',
             'title' => 'Important Contacts',
         ],
