@@ -4,13 +4,17 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ClassroomResource\Pages;
 use App\Filament\Resources\ClassroomResource\RelationManagers;
+use App\Models\AiSetting;
 use App\Models\Classroom;
 use App\Models\School;
+use App\Services\Classroom\TimetableOcrService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Forms\Components\Actions;
+use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Tabs;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
@@ -28,11 +32,16 @@ use Filament\Forms\Components\TimePicker;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
+use Filament\Notifications\Notification;
+use RuntimeException;
 
 class ClassroomResource extends Resource
 {
     protected static ?string $model = Classroom::class;
     protected static ?string $navigationIcon = 'heroicon-o-academic-cap';
+
+    /** @var string */
+    private const AI_PROVIDER = 'openrouter';
 
     public static function form(Form $form): Form
     {
@@ -95,6 +104,15 @@ class ClassroomResource extends Resource
                                             ->disk('public')
                                             ->directory(fn (?Classroom $record) => $record ? "classrooms/{$record->id}/timetable" : "temp")
                                             ->visibility('public'),
+                                        Actions::make([
+                                            Action::make('extract_timetable')
+                                                ->label('Generate Timetable from Image')
+                                                ->requiresConfirmation()
+                                                ->action(function (?Classroom $record, TimetableOcrService $service): void {
+                                                    static::runTimetableExtraction($record, $service);
+                                                })
+                                                ->disabled(fn (?Classroom $record): bool => !$record || !$record->timetable_image_path),
+                                        ]),
                                         CheckboxList::make('active_days')
                                             ->label('Select Active Days')
                                             ->options([
@@ -381,5 +399,54 @@ class ClassroomResource extends Resource
         }
 
         return $creator->name ?: ($creator->phone ?: 'User');
+    }
+
+    /**
+     * Run timetable extraction for a classroom.
+     */
+    protected static function runTimetableExtraction(?Classroom $record, TimetableOcrService $service): void
+    {
+        if (!$record) {
+            Notification::make()
+                ->title('Classroom is missing')
+                ->danger()
+                ->send();
+            return;
+        }
+
+        $setting = static::getAiSettingForClassroom($record);
+        if (!$setting || !$setting->token || !$setting->model || !$setting->timetable_prompt) {
+            Notification::make()
+                ->title('OpenRouter settings are missing')
+                ->danger()
+                ->send();
+            return;
+        }
+
+        try {
+            $service->extractAndSaveTimetable($record, $setting);
+        } catch (RuntimeException $exception) {
+            Notification::make()
+                ->title($exception->getMessage())
+                ->danger()
+                ->send();
+            return;
+        }
+
+        Notification::make()
+            ->title('Timetable extracted')
+            ->success()
+            ->send();
+    }
+
+    /**
+     * Get AI settings for a classroom.
+     */
+    protected static function getAiSettingForClassroom(Classroom $record): ?AiSetting
+    {
+        return AiSetting::query()
+            ->where('classroom_id', $record->id)
+            ->where('provider', self::AI_PROVIDER)
+            ->first();
     }
 }

@@ -4,11 +4,17 @@ namespace App\Filament\Resources\BuilderTemplateResource\Pages;
 
 use App\Filament\Resources\BuilderTemplateResource;
 use App\Models\BuilderTemplateVersion;
+use App\Models\AiSetting;
+use App\Models\Classroom;
+use App\Services\Ai\OpenRouterService;
 use App\Services\Builder\TemplateManager;
 use Filament\Actions;
+use Filament\Forms\Components\MultiSelect;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Pages\EditRecord;
+use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Schema;
 
 class EditBuilderTemplate extends EditRecord
 {
@@ -32,6 +38,22 @@ class EditBuilderTemplate extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            Actions\Action::make('insertSchemaFields')
+                ->label('Insert Schema Fields')
+                ->form([
+                    Select::make('classroom_id')
+                        ->label('Classroom')
+                        ->options(Classroom::query()->orderBy('name')->pluck('name', 'id'))
+                        ->searchable()
+                        ->required(),
+                    MultiSelect::make('schema_fields')
+                        ->label('Schema Fields')
+                        ->options($this->getSchemaFieldOptions())
+                        ->required(),
+                ])
+                ->action(function (array $data, OpenRouterService $service): void {
+                    $this->createTemplateHtmlWithSchemaFields($data, $service);
+                }),
             Actions\Action::make('publish')
                 ->label('Publish')
                 ->requiresConfirmation()
@@ -94,5 +116,123 @@ class EditBuilderTemplate extends EditRecord
         $data['updated_by'] = auth()->id();
 
         return $data;
+    }
+
+    /**
+     * Create updated template HTML using schema fields.
+     */
+    protected function createTemplateHtmlWithSchemaFields(array $data, OpenRouterService $service): void
+    {
+        $classroomId = (int) ($data['classroom_id'] ?? 0);
+        $schemaFields = $data['schema_fields'] ?? [];
+        if (!$classroomId || !is_array($schemaFields) || $schemaFields === []) {
+            Notification::make()
+                ->title('Classroom and fields are required')
+                ->danger()
+                ->send();
+            return;
+        }
+
+        $setting = $this->getAiSettingsForClassroom($classroomId);
+        if (!$setting || !$setting->token || !$setting->model || !$setting->builder_template_prompt) {
+            Notification::make()
+                ->title('OpenRouter settings are missing')
+                ->danger()
+                ->send();
+            return;
+        }
+
+        $html = (string) ($this->record->draft_html ?? '');
+        if ($html === '') {
+            Notification::make()
+                ->title('HTML is empty')
+                ->danger()
+                ->send();
+            return;
+        }
+
+        $prompt = $this->buildTemplatePrompt($setting->builder_template_prompt, $schemaFields, $html);
+        $responseHtml = $service->requestTemplateUpdate($setting->token, $setting->model, $prompt);
+        if (!$responseHtml) {
+            Notification::make()
+                ->title('OpenRouter returned an empty response')
+                ->danger()
+                ->send();
+            return;
+        }
+
+        $this->record->update([
+            'draft_html' => $responseHtml,
+            'updated_by' => auth()->id(),
+        ]);
+
+        $this->record->refresh();
+        $this->form->fill($this->record->toArray());
+
+        Notification::make()
+            ->title('HTML updated')
+            ->success()
+            ->send();
+    }
+
+    /**
+     * Build the prompt for template updates.
+     */
+    protected function buildTemplatePrompt(string $basePrompt, array $schemaFields, string $html): string
+    {
+        $fields = implode("\n", array_map(static fn (string $field): string => '- '.$field, $schemaFields));
+
+        return trim($basePrompt)
+            ."\n\nAvailable schema fields:\n".$fields
+            ."\n\nCurrent HTML:\n".$html
+            ."\n\nReturn only the updated HTML with no additional text.";
+    }
+
+    /**
+     * Build the schema field options.
+     *
+     * @return array<string, array<string, string>>
+     */
+    protected function getSchemaFieldOptions(): array
+    {
+        return [
+            'Classroom' => $this->getTableFieldOptions('classrooms'),
+            'Timetable Entries' => $this->getTableFieldOptions('timetable_entries'),
+            'Important Contacts' => $this->getTableFieldOptions('important_contacts'),
+            'Children' => $this->getTableFieldOptions('children'),
+            'Child Contacts' => $this->getTableFieldOptions('child_contacts'),
+            'Links' => $this->getTableFieldOptions('class_links'),
+            'Holidays' => $this->getTableFieldOptions('holidays'),
+            'Announcements' => $this->getTableFieldOptions('announcements'),
+        ];
+    }
+
+    /**
+     * Get table field options for a schema table.
+     *
+     * @return array<string, string>
+     */
+    protected function getTableFieldOptions(string $table): array
+    {
+        $columns = Schema::getColumnListing($table);
+        $options = [];
+
+        foreach ($columns as $column) {
+            $key = $table.'.'.$column;
+            $options[$key] = $key;
+        }
+
+        return $options;
+    }
+
+    /**
+     * Get AI settings for a classroom.
+     */
+    protected function getAiSettingsForClassroom(int $classroomId): ?AiSetting
+    {
+        return AiSetting::query()
+            ->where('classroom_id', $classroomId)
+            ->where('provider', 'openrouter')
+            ->first();
     }
 }
