@@ -37,8 +37,7 @@ class ClassroomSchema extends Page
                         return [$classroom->id => $label];
                     }))
                     ->searchable()
-                    ->reactive()
-                    ->afterStateUpdated(fn () => $this->resetTable()),
+                    ->reactive(),
             ]);
     }
 
