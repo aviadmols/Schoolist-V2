@@ -11,13 +11,29 @@ class OpenRouterService
     private const BASE_URL = 'https://openrouter.ai/api/v1';
 
     /** @var int */
-    private const REQUEST_TIMEOUT_SECONDS = 60;
+    private const REQUEST_TIMEOUT_SECONDS = 120;
+
+    /** @var int */
+    private const ERROR_BODY_LIMIT = 500;
+
+    /** @var string|null */
+    private ?string $lastError = null;
+
+    /**
+     * Get the last error message.
+     */
+    public function getLastError(): ?string
+    {
+        return $this->lastError;
+    }
 
     /**
      * Test the OpenRouter connection.
      */
     public function testConnection(string $token): bool
     {
+        $this->clearLastError();
+
         $response = $this->sendRequest($token, 'GET', self::BASE_URL.'/models');
 
         return $response->ok();
@@ -35,6 +51,8 @@ class OpenRouterService
         string $imageMime,
         string $imageBase64
     ): ?string {
+        $this->clearLastError();
+
         $payload = [
             'model' => $model,
             'messages' => [
@@ -48,12 +66,14 @@ class OpenRouterService
             ],
         ];
 
-        $response = $this->sendRequest($token, 'POST', self::BASE_URL.'/chat/completions', $payload);
-        if (!$response->ok()) {
+        try {
+            $response = $this->sendRequest($token, 'POST', self::BASE_URL.'/chat/completions', $payload);
+        } catch (\Throwable $exception) {
+            $this->lastError = $exception->getMessage();
             return null;
         }
 
-        return $response->json('choices.0.message.content');
+        return $this->resolveResponseContent($response);
     }
 
     /**
@@ -63,6 +83,8 @@ class OpenRouterService
      */
     public function requestTemplateUpdate(string $token, string $model, string $prompt): ?string
     {
+        $this->clearLastError();
+
         $payload = [
             'model' => $model,
             'messages' => [
@@ -73,12 +95,14 @@ class OpenRouterService
             ],
         ];
 
-        $response = $this->sendRequest($token, 'POST', self::BASE_URL.'/chat/completions', $payload);
-        if (!$response->ok()) {
+        try {
+            $response = $this->sendRequest($token, 'POST', self::BASE_URL.'/chat/completions', $payload);
+        } catch (\Throwable $exception) {
+            $this->lastError = $exception->getMessage();
             return null;
         }
 
-        return $response->json('choices.0.message.content');
+        return $this->resolveResponseContent($response);
     }
 
     /**
@@ -93,6 +117,8 @@ class OpenRouterService
         ?string $imageMime = null,
         ?string $imageBase64 = null
     ): ?string {
+        $this->clearLastError();
+
         $content = [
             ['type' => 'text', 'text' => $prompt],
         ];
@@ -111,12 +137,14 @@ class OpenRouterService
             ],
         ];
 
-        $response = $this->sendRequest($token, 'POST', self::BASE_URL.'/chat/completions', $payload);
-        if (!$response->ok()) {
+        try {
+            $response = $this->sendRequest($token, 'POST', self::BASE_URL.'/chat/completions', $payload);
+        } catch (\Throwable $exception) {
+            $this->lastError = $exception->getMessage();
             return null;
         }
 
-        return $response->json('choices.0.message.content');
+        return $this->resolveResponseContent($response);
     }
 
     /**
@@ -133,5 +161,53 @@ class OpenRouterService
         }
 
         return $client->post($url, $payload);
+    }
+
+    /**
+     * Resolve response content or store an error message.
+     */
+    private function resolveResponseContent(Response $response): ?string
+    {
+        if (!$response->ok()) {
+            $this->lastError = $this->buildErrorMessage($response);
+            return null;
+        }
+
+        $content = $response->json('choices.0.message.content');
+        if (!is_string($content) || trim($content) === '') {
+            $this->lastError = 'OpenRouter response missing content.';
+            return null;
+        }
+
+        return $content;
+    }
+
+    /**
+     * Build a readable error message from the response.
+     */
+    private function buildErrorMessage(Response $response): string
+    {
+        $status = $response->status();
+        $message = (string) $response->json('error.message', '');
+        if ($message !== '') {
+            return 'HTTP '.$status.': '.$message;
+        }
+
+        $body = trim($response->body());
+        if ($body === '') {
+            return 'HTTP '.$status.': Empty response body.';
+        }
+
+        $truncated = mb_substr($body, 0, self::ERROR_BODY_LIMIT);
+
+        return 'HTTP '.$status.': '.$truncated;
+    }
+
+    /**
+     * Clear the last error message.
+     */
+    private function clearLastError(): void
+    {
+        $this->lastError = null;
     }
 }

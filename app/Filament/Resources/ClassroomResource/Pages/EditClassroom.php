@@ -102,8 +102,10 @@ class EditClassroom extends EditRecord
         );
 
         if (!$response) {
+            $error = $service->getLastError();
             Notification::make()
-                ->title('OpenRouter returned an empty response')
+                ->title('OpenRouter request failed')
+                ->body($error ?: 'OpenRouter returned an empty response.')
                 ->danger()
                 ->send();
             return;
@@ -393,8 +395,8 @@ class EditClassroom extends EditRecord
     protected function getAiSetting(): ?AiSetting
     {
         return AiSetting::query()
-            ->where('classroom_id', $this->record->id)
             ->where('provider', self::AI_PROVIDER)
+            ->whereNull('classroom_id')
             ->first();
     }
 }

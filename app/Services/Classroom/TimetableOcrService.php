@@ -24,6 +24,9 @@ class TimetableOcrService
     /** @var int */
     private const DEFAULT_SORT_INCREMENT = 10;
 
+    /** @var int */
+    private const REQUEST_TIME_LIMIT_SECONDS = 120;
+
     /** @var OpenRouterService */
     private OpenRouterService $openRouterService;
 
@@ -40,6 +43,8 @@ class TimetableOcrService
      */
     public function extractAndSaveTimetable(Classroom $classroom, AiSetting $setting): void
     {
+        $this->extendExecutionTimeLimit();
+
         $imagePath = (string) $classroom->timetable_image_path;
         if ($imagePath === '') {
             throw new RuntimeException('Timetable image is missing.');
@@ -72,6 +77,15 @@ class TimetableOcrService
 
         $parsed = $this->parseTimetableResponse($responseText);
         $this->storeTimetableEntries($classroom, $parsed);
+    }
+
+    /**
+     * Extend the PHP execution time for longer requests.
+     */
+    private function extendExecutionTimeLimit(): void
+    {
+        @set_time_limit(self::REQUEST_TIME_LIMIT_SECONDS);
+        @ini_set('max_execution_time', (string) self::REQUEST_TIME_LIMIT_SECONDS);
     }
 
     /**

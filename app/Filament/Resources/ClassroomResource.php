@@ -414,7 +414,7 @@ class ClassroomResource extends Resource
             return;
         }
 
-        $setting = static::getAiSettingForClassroom($record);
+        $setting = static::getGlobalAiSetting();
         if (!$setting || !$setting->token || !$setting->model || !$setting->timetable_prompt) {
             Notification::make()
                 ->title('OpenRouter settings are missing')
@@ -440,13 +440,13 @@ class ClassroomResource extends Resource
     }
 
     /**
-     * Get AI settings for a classroom.
+     * Get global AI settings.
      */
-    protected static function getAiSettingForClassroom(Classroom $record): ?AiSetting
+    protected static function getGlobalAiSetting(): ?AiSetting
     {
         return AiSetting::query()
-            ->where('classroom_id', $record->id)
             ->where('provider', self::AI_PROVIDER)
+            ->whereNull('classroom_id')
             ->first();
     }
 }

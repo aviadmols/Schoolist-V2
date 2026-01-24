@@ -3,9 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\AiSetting;
-use App\Models\Classroom;
 use App\Services\Ai\OpenRouterService;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
@@ -42,9 +40,7 @@ class OpenRouterSettings extends Page
      */
     public function mount(): void
     {
-        $firstClassroomId = Classroom::query()->value('id');
         $this->data = [
-            'classroom_id' => $firstClassroomId,
             'token' => null,
             'model' => null,
             'timetable_prompt' => self::DEFAULT_TIMETABLE_PROMPT,
@@ -53,9 +49,7 @@ class OpenRouterSettings extends Page
             'content_analyzer_prompt' => self::DEFAULT_CONTENT_ANALYZER_PROMPT,
         ];
 
-        if ($firstClassroomId) {
-            $this->loadSettingsForClassroom($firstClassroomId);
-        }
+        $this->loadSettings();
     }
 
     /**
@@ -65,13 +59,6 @@ class OpenRouterSettings extends Page
     {
         return $form
             ->schema([
-                Select::make('classroom_id')
-                    ->label('Classroom')
-                    ->options(Classroom::query()->pluck('name', 'id'))
-                    ->searchable()
-                    ->required()
-                    ->reactive()
-                    ->afterStateUpdated(fn ($state) => $this->loadSettingsForClassroom((int) $state)),
                 TextInput::make('token')
                     ->label('API Token')
                     ->password()
@@ -82,11 +69,11 @@ class OpenRouterSettings extends Page
                     ->placeholder('provider/model')
                     ->required(),
                 Textarea::make('timetable_prompt')
-                    ->label('Timetable Prompt')
+                    ->label('Timetable OCR Prompt')
                     ->rows(12)
                     ->required(),
                 Textarea::make('builder_template_prompt')
-                    ->label('Template Prompt')
+                    ->label('Builder Template Prompt')
                     ->rows(12)
                     ->required(),
                 TextInput::make('content_analyzer_model')
@@ -107,7 +94,6 @@ class OpenRouterSettings extends Page
     public function saveSettings(): void
     {
         $this->validate([
-            'data.classroom_id' => ['required', 'integer'],
             'data.token' => ['required', 'string'],
             'data.model' => ['required', 'string'],
             'data.timetable_prompt' => ['required', 'string'],
@@ -128,8 +114,8 @@ class OpenRouterSettings extends Page
 
         AiSetting::query()->updateOrCreate(
             [
-                'classroom_id' => $this->data['classroom_id'],
                 'provider' => self::PROVIDER,
+                'classroom_id' => null,
             ],
             $payload
         );
@@ -165,13 +151,13 @@ class OpenRouterSettings extends Page
     }
 
     /**
-     * Load settings for the selected classroom.
+     * Load settings for the OpenRouter provider.
      */
-    private function loadSettingsForClassroom(int $classroomId): void
+    private function loadSettings(): void
     {
         $setting = AiSetting::query()
-            ->where('classroom_id', $classroomId)
             ->where('provider', self::PROVIDER)
+            ->whereNull('classroom_id')
             ->first();
 
         if (!$setting) {
