@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ClassroomResource\RelationManagers;
 
+use App\Filament\Resources\ClassroomResource\RelationManagers\Concerns\FormatsCreatorLabel;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -10,8 +11,13 @@ use Filament\Tables\Table;
 
 class HolidaysRelationManager extends RelationManager
 {
+    use FormatsCreatorLabel;
+
     protected static string $relationship = 'holidays';
 
+    /**
+     * Build the holiday form.
+     */
     public function form(Form $form): Form
     {
         return $form
@@ -32,6 +38,9 @@ class HolidaysRelationManager extends RelationManager
             ]);
     }
 
+    /**
+     * Build the holidays table.
+     */
     public function table(Table $table): Table
     {
         return $table
@@ -43,6 +52,11 @@ class HolidaysRelationManager extends RelationManager
                 Tables\Columns\IconColumn::make('is_no_school')
                     ->label('Summer Camp')
                     ->boolean(),
+                Tables\Columns\TextColumn::make('updated_at')->label('Updated')->dateTime()->sortable(),
+                Tables\Columns\TextColumn::make('updated_by_label')
+                    ->label('Updated By')
+                    ->getStateUsing(fn ($record): string => $this->formatCreatorLabel($record))
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 //

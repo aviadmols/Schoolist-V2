@@ -23,12 +23,6 @@ use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\RichEditor;
-use Filament\Forms\Components\TimePicker;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
@@ -122,207 +116,9 @@ class ClassroomResource extends Resource
                                             ->columns(7)
                                             ->live(),
                                     ]),
-
-                                ...static::getDayRepeaterSchema(0, 'Sunday (יום א\')', 'sundayEntries'),
-                                ...static::getDayRepeaterSchema(1, 'Monday (יום ב\')', 'mondayEntries'),
-                                ...static::getDayRepeaterSchema(2, 'Tuesday (יום ג\')', 'tuesdayEntries'),
-                                ...static::getDayRepeaterSchema(3, 'Wednesday (יום ד\')', 'wednesdayEntries'),
-                                ...static::getDayRepeaterSchema(4, 'Thursday (יום ה\')', 'thursdayEntries'),
-                                ...static::getDayRepeaterSchema(5, 'Friday (יום ו\')', 'fridayEntries'),
-                                ...static::getDayRepeaterSchema(6, 'Saturday (יום ש\')', 'saturdayEntries'),
-                            ]),
-
-                        // --- TAB: CONTACTS ---
-                        Tabs\Tab::make('Contacts')
-                            ->icon('heroicon-o-phone')
-                            ->schema([
-                                Repeater::make('importantContacts')
-                                    ->relationship()
-                                    ->schema([
-                                        static::createdByPlaceholder(),
-                                        TextInput::make('first_name')->label('First Name')->required(),
-                                        TextInput::make('last_name')->label('Last Name')->required(),
-                                        TextInput::make('role')->label('Role')->required(),
-                                        TextInput::make('phone')->label('Phone')->tel()
-                                            ->helperText(fn ($state) => $state && !preg_match('/^05\d{8}$/', $state) ? new HtmlString('<span class="text-warning-600 text-xs">Note: Standard format is 050-0000000</span>') : null),
-                                        TextInput::make('email')->label('Email')->email(),
-                                    ])->columns(2)->addActionLabel('Add New Contact')
-                                    ->defaultItems(0), // Fixed: Start empty
-                            ]),
-
-                        // --- TAB: CHILDREN ---
-                        Tabs\Tab::make('Children')
-                            ->icon('heroicon-o-user-group')
-                            ->schema([
-                                Repeater::make('children')
-                                    ->relationship()
-                                    ->schema([
-                                        static::createdByPlaceholder(),
-                                        TextInput::make('name')
-                                            ->label('Child Name')
-                                            ->required(),
-                                        DatePicker::make('birth_date')
-                                            ->label('Birth Date'),
-                                        Repeater::make('contacts')
-                                            ->relationship()
-                                            ->schema([
-                                                static::createdByPlaceholder(),
-                                                TextInput::make('name')
-                                                    ->label('Contact Name')
-                                                    ->required(),
-                                                Select::make('relation')
-                                                    ->label('Relation')
-                                                    ->options([
-                                                        'father' => 'Father',
-                                                        'mother' => 'Mother',
-                                                        'other' => 'Other',
-                                                    ])
-                                                    ->required(),
-                                                TextInput::make('phone')
-                                                    ->label('Phone')
-                                                    ->tel()
-                                                    ->helperText(fn ($state) => $state && !preg_match('/^05\d{8}$/', $state) ? new HtmlString('<span class="text-warning-600 text-xs">Note: Standard format is 050-0000000</span>') : null),
-                                            ])
-                                            ->columns(3)
-                                            ->addActionLabel('Add Contact')
-                                            ->defaultItems(0),
-                                    ])->columns(1)->addActionLabel('Add New Child')
-                                    ->defaultItems(0), // Fixed: Start empty
-                            ]),
-
-                        // --- TAB: LINKS ---
-                        Tabs\Tab::make('Links & Materials')
-                            ->icon('heroicon-o-link')
-                            ->schema([
-                                Repeater::make('links')
-                                    ->relationship()
-                                    ->schema([
-                                        static::createdByPlaceholder(),
-                                        TextInput::make('title')->label('Title')->required(),
-                                        TextInput::make('url')
-                                            ->label('URL')
-                                            ->url()
-                                            ->requiredWithout('file_path')
-                                            ->nullable(),
-                                        FileUpload::make('file_path')
-                                            ->label('File')
-                                            ->disk('public')
-                                            ->directory(function (Forms\Get $get): string {
-                                                $classroomId = $get('../../id');
-                                                return $classroomId ? "classrooms/{$classroomId}/links" : 'temp';
-                                            })
-                                            ->visibility('public')
-                                            ->requiredWithout('url'),
-                                        Select::make('category')
-                                            ->label('Category')
-                                            ->options([
-                                                'group_whatsapp' => 'Group WhatsApp',
-                                                'important_links' => 'Important links',
-                                            ])
-                                            ->required(),
-                                    ])->columns(3)->addActionLabel('Add New Link')
-                                    ->defaultItems(0), // Fixed: Start empty
-                            ]),
-
-                        // --- TAB: HOLIDAYS ---
-                        Tabs\Tab::make('Holidays')
-                            ->icon('heroicon-o-sun')
-                            ->schema([
-                                Repeater::make('holidays')
-                                    ->relationship()
-                                    ->schema([
-                                        static::createdByPlaceholder(),
-                                        TextInput::make('name')->label('Holiday Name')->required(),
-                                        DatePicker::make('start_date')->label('Start Date')->required(),
-                                        DatePicker::make('end_date')->label('End Date')->required(),
-                                        Toggle::make('is_no_school')->label('Is Summer Camp (יש קייטנה)')->default(false),
-                                    ])->columns(4)->addActionLabel('Add New Holiday')
-                                    ->defaultItems(0), // Fixed: Start empty
-                            ]),
-
-                        // --- TAB: ANNOUNCEMENTS ---
-                        Tabs\Tab::make('Announcements')
-                            ->icon('heroicon-o-bell')
-                            ->schema([
-                                Repeater::make('announcements')
-                                    ->relationship()
-                                    ->schema([
-                                        static::createdByPlaceholder(),
-                                        Select::make('type')
-                                            ->label('Post Type')
-                                            ->options([
-                                                'event' => 'Event',
-                                                'message' => 'Message',
-                                                'homework' => 'Homework',
-                                            ])
-                                            ->default('message'),
-                                        TextInput::make('title')
-                                            ->label('Title')
-                                            ->required(),
-                                        RichEditor::make('content')
-                                            ->label('Content'),
-                                        DatePicker::make('occurs_on_date')
-                                            ->label('Target Date'),
-                                        DatePicker::make('end_date')
-                                            ->label('End Date'),
-                                        Select::make('day_of_week')
-                                            ->label('Day of Week')
-                                            ->options([
-                                                0 => 'Sunday',
-                                                1 => 'Monday',
-                                                2 => 'Tuesday',
-                                                3 => 'Wednesday',
-                                                4 => 'Thursday',
-                                                5 => 'Friday',
-                                                6 => 'Saturday',
-                                            ]),
-                                        Toggle::make('always_show')
-                                            ->label('Always Show')
-                                            ->default(false),
-                                        TimePicker::make('occurs_at_time')
-                                            ->label('Time'),
-                                        TextInput::make('location')
-                                            ->label('Location'),
-                                        FileUpload::make('attachment_path')
-                                            ->label('Attachment')
-                                            ->disk('public')
-                                            ->directory(function (Forms\Get $get): string {
-                                                $classroomId = $get('../../id');
-                                                return $classroomId ? "classrooms/{$classroomId}/announcements" : 'temp';
-                                            })
-                                            ->visibility('public'),
-                                    ])
-                                    ->columns(2)
-                                    ->addActionLabel('Add Announcement')
-                                    ->defaultItems(0),
                             ]),
                     ])->columnSpanFull()
             ])->columns(1);
-    }
-
-    protected static function getDayRepeaterSchema(int $dayId, string $label, string $relationship): array
-    {
-        return [
-            Section::make($label)
-                ->collapsible()
-                ->collapsed()
-                ->hidden(fn (Forms\Get $get) => !in_array((string)$dayId, array_map('strval', $get('active_days') ?? [])))
-                ->schema([
-                    Repeater::make($relationship)
-                        ->relationship()
-                        ->schema([
-                            static::createdByPlaceholder(),
-                            TextInput::make('subject')->label('Lesson Name')->required(),
-                            TextInput::make('teacher')->label('Teacher (Optional)'),
-                            TextInput::make('special_message')->label('Special Message'),
-                            Forms\Components\Hidden::make('day_of_week')->default($dayId),
-                        ])
-                        ->columns(3)
-                        ->reorderable('sort_order')
-                        ->addActionLabel('Add Lesson for ' . $label)
-                        ->defaultItems(0), // Fixed: Start empty
-                ]),
-        ];
     }
 
     public static function table(Table $table): Table
@@ -345,6 +141,12 @@ class ClassroomResource extends Resource
     public static function getRelations(): array
     {
         return [
+            RelationManagers\TimetableEntriesRelationManager::class,
+            RelationManagers\ImportantContactsRelationManager::class,
+            RelationManagers\ChildrenRelationManager::class,
+            RelationManagers\LinksRelationManager::class,
+            RelationManagers\HolidaysRelationManager::class,
+            RelationManagers\AnnouncementsRelationManager::class,
             RelationManagers\UsersRelationManager::class,
         ];
     }

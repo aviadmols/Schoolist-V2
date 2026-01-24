@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ClassroomResource\RelationManagers;
 
+use App\Filament\Resources\ClassroomResource\RelationManagers\Concerns\FormatsCreatorLabel;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -11,8 +12,13 @@ use Illuminate\Support\HtmlString;
 
 class ImportantContactsRelationManager extends RelationManager
 {
+    use FormatsCreatorLabel;
+
     protected static string $relationship = 'importantContacts';
 
+    /**
+     * Build the contact form.
+     */
     public function form(Form $form): Form
     {
         return $form
@@ -41,6 +47,9 @@ class ImportantContactsRelationManager extends RelationManager
             ]);
     }
 
+    /**
+     * Build the contacts table.
+     */
     public function table(Table $table): Table
     {
         return $table
@@ -50,6 +59,11 @@ class ImportantContactsRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('last_name')->label('Last Name')->searchable(),
                 Tables\Columns\TextColumn::make('role')->label('Role'),
                 Tables\Columns\TextColumn::make('phone')->label('Phone'),
+                Tables\Columns\TextColumn::make('updated_at')->label('Updated')->dateTime()->sortable(),
+                Tables\Columns\TextColumn::make('updated_by_label')
+                    ->label('Updated By')
+                    ->getStateUsing(fn ($record): string => $this->formatCreatorLabel($record))
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 //
