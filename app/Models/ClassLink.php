@@ -16,6 +16,7 @@ class ClassLink extends Model
         'classroom_id',
         'created_by_user_id',
         'title',
+        'category',
         'url',
         'file_path',
         'icon',

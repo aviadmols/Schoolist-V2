@@ -143,6 +143,8 @@ class ClassroomResource extends Resource
                                         TextInput::make('name')
                                             ->label('Child Name')
                                             ->required(),
+                                        DatePicker::make('birth_date')
+                                            ->label('Birth Date'),
                                         Repeater::make('contacts')
                                             ->relationship()
                                             ->schema([
@@ -193,7 +195,13 @@ class ClassroomResource extends Resource
                                             })
                                             ->visibility('public')
                                             ->requiredWithout('url'),
-                                        TextInput::make('category')->label('Category')->placeholder('e.g. Homework'),
+                                        Select::make('category')
+                                            ->label('Category')
+                                            ->options([
+                                                'group_whatsapp' => 'Group WhatsApp',
+                                                'important_links' => 'Important links',
+                                            ])
+                                            ->required(),
                                     ])->columns(3)->addActionLabel('Add New Link')
                                     ->defaultItems(0), // Fixed: Start empty
                             ]),

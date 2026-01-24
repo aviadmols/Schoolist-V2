@@ -93,58 +93,6 @@ async function postJson(url, payload) {
 }
 
 /**
- * Check if the browser supports Web OTP.
- *
- * @returns {boolean}
- */
-function supportsWebOtp() {
-  return typeof window !== 'undefined' && 'OTPCredential' in window && window.isSecureContext;
-}
-
-/**
- * Start listening for an SMS OTP code.
- *
- * @returns {Promise<void>}
- */
-async function startOtpListener() {
-  if (!supportsWebOtp() || isOtpListening.value || step.value !== 'code') return;
-
-  isOtpListening.value = true;
-  const controller = new AbortController();
-  otpAbortController.value = controller;
-
-  try {
-    const otp = await navigator.credentials.get({
-      otp: { transport: ['sms'] },
-      signal: controller.signal,
-    });
-
-    if (otp?.code) {
-      code.value = otp.code;
-      handleSubmit();
-    }
-  } catch (_) {
-    // Ignore errors or aborts.
-  } finally {
-    isOtpListening.value = false;
-    otpAbortController.value = null;
-  }
-}
-
-/**
- * Stop listening for OTP codes.
- *
- * @returns {void}
- */
-function stopOtpListener() {
-  if (otpAbortController.value) {
-    otpAbortController.value.abort();
-    otpAbortController.value = null;
-  }
-  isOtpListening.value = false;
-}
-
-/**
  * Handle the submit flow.
  *
  * @returns {void}

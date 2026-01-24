@@ -16,7 +16,13 @@ class Child extends Model
         'classroom_id',
         'created_by_user_id',
         'name',
+        'birth_date',
         'photo_file_id',
+    ];
+
+    /** @var array<string, string> */
+    protected $casts = [
+        'birth_date' => 'date',
     ];
 
     /**

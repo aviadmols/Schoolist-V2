@@ -39,11 +39,12 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import AuthLayout from '../../layouts/AuthLayout.vue';
 import UiButton from '../../components/ui/UiButton.vue';
 import UiField from '../../components/ui/UiField.vue';
 import UiInput from '../../components/ui/UiInput.vue';
+import OtpInput from '../../components/ui/OtpInput.vue';
 
 /**
  * Qlink login page.
