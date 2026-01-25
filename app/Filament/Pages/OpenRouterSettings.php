@@ -87,8 +87,6 @@ FORMAT RULES:
 - If the image contains text but NO schedule-related content (e.g., only random text, no days/times/subjects), return: {"ok": false, "reason": "Image contains text but no schedule information"}
 - ONLY return ok: false if you are 100% certain there is NO schedule in the image
 PROMPT;
-    }
-PROMPT;
 
     /** @var string */
     private const DEFAULT_TEMPLATE_PROMPT = <<<'PROMPT'
