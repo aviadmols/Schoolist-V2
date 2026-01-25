@@ -205,9 +205,9 @@ class BuilderTemplateResource extends Resource
                     ->dateTime(),
                 Tables\Columns\TextColumn::make('preview_url')
                     ->label('Preview')
-                    ->state(fn (BuilderTemplate $record): string => $record->key === 'auth.qlink' ? url('/qlink/123456789012') : ($record->key === 'auth.login' ? url('/login') : ''))
+                    ->getStateUsing(fn (BuilderTemplate $record): string => $record->key === 'auth.qlink' ? url('/qlink/123456789012') : ($record->key === 'auth.login' ? url('/login') : ''))
                     ->url(fn (string $state): string => $state, true)
-                    ->visible(fn (BuilderTemplate $record): bool => in_array($record->key, ['auth.qlink', 'auth.login'])),
+                    ->visible(fn (?BuilderTemplate $record): bool => $record && in_array($record->key, ['auth.qlink', 'auth.login'])),
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
