@@ -57,6 +57,26 @@ class QlinkResource extends Resource
                     ->label('Open Link')
                     ->state(fn (Qlink $record): string => url('/qlink/' . $record->token))
                     ->url(fn (Qlink $record): string => url('/qlink/' . $record->token), true),
+                Tables\Columns\TextColumn::make('template_status')
+                    ->label('Template Status')
+                    ->getStateUsing(function (Qlink $record): string {
+                        $template = \App\Models\BuilderTemplate::where('key', 'auth.qlink')
+                            ->where('scope', 'global')
+                            ->first();
+
+                        if (!$template) return 'No Template';
+                        if (!$template->is_override_enabled) return 'Override Disabled (Using Default)';
+
+                        $hasPublished = (bool) ($template->published_html || $template->published_css || $template->published_js);
+                        return $hasPublished ? 'Custom Template Active' : 'Draft Only (Using Default)';
+                    })
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'Custom Template Active' => 'success',
+                        'No Template' => 'danger',
+                        'Override Disabled (Using Default)', 'Draft Only (Using Default)' => 'warning',
+                        default => 'gray',
+                    }),
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Active')
                     ->boolean()
