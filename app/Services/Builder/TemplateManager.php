@@ -290,7 +290,16 @@ class TemplateManager
     <div class="notices-list">
       @if (!empty($page['announcements']))
         @foreach ($page['announcements'] as $announcement)
-          <div class="notice-row">
+          <div
+            class="notice-row"
+            data-item-popup="popup-content"
+            data-item-type="{{ $announcement['type'] ?? 'message' }}"
+            data-item-title="{{ $announcement['title'] ?? '' }}"
+            data-item-content="{{ $announcement['content'] ?? '' }}"
+            data-item-date="{{ $announcement['date'] ?? '' }}"
+            data-item-time="{{ $announcement['time'] ?? '' }}"
+            data-item-location="{{ $announcement['location'] ?? '' }}"
+          >
             <span style="color: var(--blue-primary);">✓</span>
             <span>{{ $announcement['title'] ?? ($announcement['content'] ?? '') }}</span>
           </div>
@@ -303,6 +312,47 @@ class TemplateManager
       @endif
     </div>
     <div class="fab-btn" data-popup-target="popup-homework">+</div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">אירועים</div>
+      <img src="https://app.schoolist.co.il/storage/media/assets/u4GUGAJ888XuMp1EI4roXPiQ996DzG95qiohqyID.svg" class="icon-edit-small" alt="">
+    </div>
+    <div class="section-divider"></div>
+
+    <div class="events-container">
+      @if (!empty($page['events']))
+        @foreach ($page['events'] as $event)
+          <div
+            class="event-row"
+            data-item-popup="popup-content"
+            data-item-type="{{ $event['type'] ?? 'event' }}"
+            data-item-title="{{ $event['title'] ?? '' }}"
+            data-item-content="{{ $event['content'] ?? '' }}"
+            data-item-date="{{ $event['date'] ?? '' }}"
+            data-item-time="{{ $event['time'] ?? '' }}"
+            data-item-location="{{ $event['location'] ?? '' }}"
+          >
+            <img src="https://cdn-icons-png.flaticon.com/512/2948/2948088.png" class="calendar-icon" alt="">
+            <div class="event-content">
+              <div class="event-main-text">{{ $event['title'] ?? '' }}</div>
+              <div class="event-sub-text">
+                @if (!empty($event['date'])) <span>{{ $event['date'] }}</span> @endif
+                @if (!empty($event['time'])) <span>{{ $event['time'] }}</span> @endif
+                @if (!empty($event['location'])) <span>{{ $event['location'] }}</span> @endif
+              </div>
+            </div>
+          </div>
+        @endforeach
+      @else
+        <div class="event-row">
+          <div class="event-content">
+            <div class="event-main-text">אין אירועים להצגה</div>
+          </div>
+        </div>
+      @endif
+    </div>
   </div>
 
   <h3 style="margin: 25px 0 15px 0; font-size: 18px;">כל מה שצריך לדעת</h3>
@@ -380,14 +430,16 @@ class TemplateManager
 [[popup:important-links]]
 [[popup:holidays]]
 [[popup:children]]
+[[popup:content]]
 [[popup:contacts]]
 [[popup:food]]
 [[popup:schedule]]
 
 <script>
   (function () {
-    const dayNames = @json($page['day_names'] ?? ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת']);
-    const timetable = @json($page['timetable'] ?? []);
+    const dayNames = Array.from(document.querySelectorAll('.day-tab'))
+      .map((tab) => (tab.textContent || '').trim());
+    const timetable = {!! json_encode($page['timetable'] ?? []) !!};
     const selectedDayNameEl = document.getElementById('selected-day-name');
     const scheduleEl = document.getElementById('schedule-content');
 
@@ -471,6 +523,40 @@ class TemplateManager
       });
     }
 
+    const contentPopupTitle = document.getElementById('popup-content-title');
+    const contentPopupType = document.getElementById('popup-content-type');
+    const contentPopupBody = document.getElementById('popup-content-body');
+    const contentPopupDate = document.getElementById('popup-content-date');
+    const contentPopupTime = document.getElementById('popup-content-time');
+    const contentPopupLocation = document.getElementById('popup-content-location');
+    const typeLabels = {
+      message: 'הודעה',
+      event: 'אירוע',
+      homework: 'שיעורי בית',
+    };
+
+    const setContentPopup = (dataset) => {
+      const type = dataset.itemType || 'message';
+      if (contentPopupType) {
+        contentPopupType.textContent = typeLabels[type] || type;
+      }
+      if (contentPopupTitle) {
+        contentPopupTitle.textContent = dataset.itemTitle || '';
+      }
+      if (contentPopupBody) {
+        contentPopupBody.textContent = dataset.itemContent || '';
+      }
+      if (contentPopupDate) {
+        contentPopupDate.textContent = dataset.itemDate || '';
+      }
+      if (contentPopupTime) {
+        contentPopupTime.textContent = dataset.itemTime || '';
+      }
+      if (contentPopupLocation) {
+        contentPopupLocation.textContent = dataset.itemLocation || '';
+      }
+    };
+
     const backdrop = document.querySelector('[data-popup-backdrop]');
     const popups = document.querySelectorAll('[data-popup]');
 
@@ -486,6 +572,16 @@ class TemplateManager
       target.classList.add('is-open');
       backdrop?.classList.add('is-open');
     };
+
+    document.querySelectorAll('[data-item-popup]').forEach((trigger) => {
+      trigger.addEventListener('click', (event) => {
+        event.preventDefault();
+        const targetId = trigger.getAttribute('data-item-popup');
+        if (!targetId) return;
+        setContentPopup(trigger.dataset);
+        openPopup(targetId);
+      });
+    });
 
     document.querySelectorAll('[data-popup-target]').forEach((trigger) => {
       trigger.addEventListener('click', (event) => {
@@ -751,6 +847,7 @@ HTML;
             'important-links' => $this->getImportantLinksPopupBodyHtml(),
             'holidays' => $this->getHolidaysPopupBodyHtml(),
             'children' => $this->getChildrenPopupBodyHtml(),
+            'content' => $this->getContentPopupBodyHtml(),
             'contacts' => $this->getContactsPopupBodyHtml(),
             'food' => $this->getFoodPopupBodyHtml(),
             'schedule' => $this->getSchedulePopupBodyHtml(),
@@ -903,6 +1000,29 @@ HTML;
     <div class="sb-row"><span>אין ילדים להצגה</span><span></span></div>
   @endif
 </div>
+HTML;
+    }
+
+    /**
+     * Build content popup body HTML.
+     */
+    private function getContentPopupBodyHtml(): string
+    {
+        return <<<'HTML'
+<div class="sb-list">
+  <div class="sb-row">
+    <span id="popup-content-type"></span>
+    <span id="popup-content-date"></span>
+  </div>
+  <div class="sb-row">
+    <strong id="popup-content-title"></strong>
+    <span id="popup-content-time"></span>
+  </div>
+  <div class="sb-row">
+    <span id="popup-content-location"></span>
+  </div>
+</div>
+<div id="popup-content-body" style="margin-top: 12px;"></div>
 HTML;
     }
 

@@ -44,6 +44,10 @@ return [
             'title' => 'Children',
         ],
         [
+            'key' => 'content',
+            'title' => 'Content',
+        ],
+        [
             'key' => 'contacts',
             'title' => 'Important Contacts',
         ],

@@ -109,6 +109,20 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
 
             return $date->isSameDay($today) || $date->greaterThan($today);
         });
+    $formatDate = function (?string $date) use ($classroom): ?string {
+        if (!$date) {
+            return null;
+        }
+
+        return Carbon::parse($date, $classroom->timezone)->format('d.m.Y');
+    };
+    $formatTime = function ($time): ?string {
+        if (!$time) {
+            return null;
+        }
+
+        return substr((string) $time, 0, 5);
+    };
     $weekStart = $today->copy()->startOfWeek();
     $weekEnd = $today->copy()->endOfWeek();
 
@@ -164,6 +178,21 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
         ->values()
         ->all();
 
+    $eventList = $eventAnnouncements
+        ->map(function (array $announcement) use ($formatDate, $formatTime): array {
+            return [
+                'id' => $announcement['id'] ?? null,
+                'type' => $announcement['type'] ?? 'event',
+                'title' => $announcement['title'] ?? '',
+                'content' => $announcement['content'] ?? '',
+                'date' => $formatDate($announcement['occurs_on_date'] ?? null),
+                'time' => $formatTime($announcement['occurs_at_time'] ?? null),
+                'location' => $announcement['location'] ?? '',
+            ];
+        })
+        ->values()
+        ->all();
+
     $pageData = [
         'school_year' => ($today->month >= 9 ? $today->year : $today->year - 1).'-'.(($today->month >= 9 ? $today->year : $today->year - 1) + 1),
         'classroom' => [
@@ -178,7 +207,21 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
         'day_labels' => $dayLabels,
         'day_names' => $dayNames,
         'timetable' => $timetableService->getWeeklyTimetable($classroom),
-        'announcements' => $announcements->values()->all(),
+        'announcements' => $announcements
+            ->map(function (array $announcement) use ($formatDate, $formatTime): array {
+                return [
+                    'id' => $announcement['id'] ?? null,
+                    'type' => $announcement['type'] ?? 'message',
+                    'title' => $announcement['title'] ?? '',
+                    'content' => $announcement['content'] ?? '',
+                    'date' => $formatDate($announcement['occurs_on_date'] ?? null),
+                    'time' => $formatTime($announcement['occurs_at_time'] ?? null),
+                    'location' => $announcement['location'] ?? '',
+                ];
+            })
+            ->values()
+            ->all(),
+        'events' => $eventList,
         'events_today' => array_merge($mapHolidays($today, $today), $eventsToday),
         'events_week' => array_merge($mapHolidays($weekStart, $weekEnd), $eventsWeek),
         'links' => ClassLink::where('classroom_id', $classroom->id)
