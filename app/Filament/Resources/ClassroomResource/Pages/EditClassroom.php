@@ -16,6 +16,7 @@ use Filament\Notifications\Actions\Action as NotificationAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class EditClassroom extends EditRecord
@@ -24,6 +25,9 @@ class EditClassroom extends EditRecord
 
     /** @var string */
     private const AI_PROVIDER = 'openrouter';
+
+    /** @var string */
+    private const AI_SUGGESTION_SESSION_KEY = 'ai_quick_add_suggestion_';
 
     /** @var string */
     private const CONTENT_ANALYZER_SUFFIX = "SCHEMA FIELDS:\n- announcements: title, content, occurs_on_date, occurs_at_time, location\n- contacts: first_name, last_name, role, phone, email\n- children: name, birth_date\n- child_contacts: name, relation, phone\n\nReturn JSON that matches the schema above.";
@@ -122,6 +126,7 @@ class EditClassroom extends EditRecord
         }
 
         $this->aiSuggestion = $suggestion;
+        session()->put($this->getAiSuggestionSessionKey(), $suggestion);
         $this->showAiSuggestionNotification($suggestion);
     }
 
@@ -131,6 +136,10 @@ class EditClassroom extends EditRecord
     public function confirmAiSuggestion(): void
     {
         if (!$this->aiSuggestion) {
+            $this->aiSuggestion = session()->get($this->getAiSuggestionSessionKey());
+        }
+
+        if (!$this->aiSuggestion) {
             Notification::make()
                 ->title('No suggestion available')
                 ->danger()
@@ -138,8 +147,23 @@ class EditClassroom extends EditRecord
             return;
         }
 
-        $summary = $this->createContentFromSuggestion($this->aiSuggestion);
+        try {
+            $summary = $this->createContentFromSuggestion($this->aiSuggestion);
+        } catch (\Throwable $exception) {
+            Log::error('AI quick add failed', [
+                'classroom_id' => $this->record?->id,
+                'error' => $exception->getMessage(),
+            ]);
+            Notification::make()
+                ->title('Unable to create content')
+                ->body('Check logs for details.')
+                ->danger()
+                ->send();
+            return;
+        }
+
         $this->aiSuggestion = null;
+        session()->forget($this->getAiSuggestionSessionKey());
 
         Notification::make()
             ->title('Content created')
@@ -154,6 +178,7 @@ class EditClassroom extends EditRecord
     public function retryAiSuggestion(): void
     {
         $this->aiSuggestion = null;
+        session()->forget($this->getAiSuggestionSessionKey());
 
         Notification::make()
             ->title('Run AI Quick Add again')
@@ -242,6 +267,14 @@ class EditClassroom extends EditRecord
             ])
             ->persistent()
             ->send();
+    }
+
+    /**
+     * Get the session key for storing AI suggestion.
+     */
+    protected function getAiSuggestionSessionKey(): string
+    {
+        return self::AI_SUGGESTION_SESSION_KEY.($this->record?->id ?? 'new');
     }
 
     /**
