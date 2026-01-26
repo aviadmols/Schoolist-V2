@@ -29,6 +29,12 @@ class EditClassroom extends EditRecord
     /** @var string */
     private const AI_SUGGESTION_SESSION_KEY = 'ai_quick_add_suggestion_';
 
+    /** @var int */
+    private const ANNOUNCEMENT_TITLE_MAX_LENGTH = 80;
+
+    /** @var array<int, string> */
+    private const DATE_FORMATS = ['Y-m-d', 'd.m.Y', 'd/m/Y', 'd-m-Y'];
+
     /** @var string */
     private const CONTENT_ANALYZER_SUFFIX = "SCHEMA FIELDS:\n- announcements: title, content, occurs_on_date, occurs_at_time, location\n- contacts: first_name, last_name, role, phone, email\n- children: name, birth_date\n- child_contacts: name, relation, phone\n\nReturn JSON that matches the schema above.";
 
@@ -153,6 +159,7 @@ class EditClassroom extends EditRecord
             Log::error('AI quick add failed', [
                 'classroom_id' => $this->record?->id,
                 'error' => $exception->getMessage(),
+                'suggestion' => $this->aiSuggestion,
             ]);
             Notification::make()
                 ->title('Unable to create content')
@@ -317,15 +324,21 @@ class EditClassroom extends EditRecord
 
         if (in_array($type, ['announcement', 'event', 'homework'], true)) {
             $announcementType = $type === 'announcement' ? 'message' : $type;
-            $date = $this->normalizeDate($data['date'] ?? $data['due_date'] ?? null);
+            $dateValue = $data['date'] ?? $data['due_date'] ?? null;
+            $dateData = $this->normalizeDateValue($dateValue);
+            $title = $this->computeAnnouncementTitle(
+                (string) ($data['title'] ?? $data['name'] ?? ''),
+                (string) ($data['content'] ?? $data['description'] ?? '')
+            );
 
             Announcement::create([
                 'classroom_id' => $classroomId,
                 'user_id' => auth()->id(),
                 'type' => $announcementType,
-                'title' => (string) ($data['title'] ?? $data['name'] ?? ''),
+                'title' => $title,
                 'content' => (string) ($data['content'] ?? $data['description'] ?? ''),
-                'occurs_on_date' => $date,
+                'occurs_on_date' => $dateData['date'],
+                'day_of_week' => $dateData['day_of_week'],
                 'occurs_at_time' => $this->normalizeTime($data['time'] ?? null),
                 'location' => (string) ($data['location'] ?? ''),
             ]);
@@ -385,6 +398,13 @@ class EditClassroom extends EditRecord
             return $text;
         }
 
+        foreach (self::DATE_FORMATS as $format) {
+            $date = \DateTime::createFromFormat($format, $text);
+            if ($date instanceof \DateTime) {
+                return $date->format('Y-m-d');
+            }
+        }
+
         return null;
     }
 
@@ -395,7 +415,50 @@ class EditClassroom extends EditRecord
     {
         $text = trim((string) $value);
 
-        return $text !== '' ? $text : null;
+        if ($text === '') {
+            return null;
+        }
+
+        if (preg_match('/\b\d{1,2}:\d{2}\b/', $text, $matches) === 1) {
+            return $matches[0];
+        }
+
+        return null;
+    }
+
+    /**
+     * Normalize date values for announcements.
+     *
+     * @return array{date: string|null, day_of_week: int|null}
+     */
+    protected function normalizeDateValue($value): array
+    {
+        $text = trim((string) $value);
+        if ($text === '') {
+            return ['date' => null, 'day_of_week' => null];
+        }
+
+        $date = $this->normalizeDate($text);
+
+        return ['date' => $date, 'day_of_week' => null];
+    }
+
+    /**
+     * Compute announcement title with a safe fallback.
+     */
+    protected function computeAnnouncementTitle(string $title, string $content): string
+    {
+        $titleText = trim($title);
+        if ($titleText !== '') {
+            return $titleText;
+        }
+
+        $contentText = trim($content);
+        if ($contentText === '') {
+            return 'Untitled';
+        }
+
+        return mb_substr($contentText, 0, self::ANNOUNCEMENT_TITLE_MAX_LENGTH);
     }
 
     /**
