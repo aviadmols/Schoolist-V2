@@ -15,6 +15,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Actions\Action as NotificationAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
+use Illuminate\Support\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -35,6 +36,24 @@ class EditClassroom extends EditRecord
 
     /** @var array<int, string> */
     private const DATE_FORMATS = ['Y-m-d', 'd.m.Y', 'd/m/Y', 'd-m-Y'];
+
+    /** @var array<string, int> */
+    private const HEBREW_DAYS = [
+        'ראשון' => 0,
+        'יום ראשון' => 0,
+        'שני' => 1,
+        'יום שני' => 1,
+        'שלישי' => 2,
+        'יום שלישי' => 2,
+        'רביעי' => 3,
+        'יום רביעי' => 3,
+        'חמישי' => 4,
+        'יום חמישי' => 4,
+        'שישי' => 5,
+        'יום שישי' => 5,
+        'שבת' => 6,
+        'יום שבת' => 6,
+    ];
 
     /** @var string */
     private const CONTENT_ANALYZER_SUFFIX = "SCHEMA FIELDS:\n- announcements: title, content, occurs_on_date, occurs_at_time, location\n- contacts: first_name, last_name, role, phone, email\n- children: name, birth_date\n- child_contacts: name, relation, phone\n\nReturn JSON that matches the schema above.";
@@ -293,19 +312,22 @@ class EditClassroom extends EditRecord
         $classroomId = (int) $this->record->id;
 
         if ($type === 'contact') {
-            $name = (string) ($data['name'] ?? '');
-            [$firstName, $lastName] = $this->splitName($name);
+            $contacts = $this->normalizeContactItems($data);
+            foreach ($contacts as $contact) {
+                $name = (string) ($contact['name'] ?? '');
+                [$firstName, $lastName] = $this->splitName($name);
 
-            ImportantContact::create([
-                'classroom_id' => $classroomId,
-                'first_name' => $firstName,
-                'last_name' => $lastName,
-                'role' => (string) ($data['role'] ?? ''),
-                'phone' => (string) ($data['phone'] ?? ''),
-                'email' => (string) ($data['email'] ?? ''),
-            ]);
+                ImportantContact::create([
+                    'classroom_id' => $classroomId,
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'role' => (string) ($contact['role'] ?? ''),
+                    'phone' => (string) ($contact['phone'] ?? ''),
+                    'email' => (string) ($contact['email'] ?? ''),
+                ]);
+            }
 
-            return 'Contact created';
+            return 'Contacts created';
         }
 
         if ($type === 'contact_page') {
@@ -323,26 +345,29 @@ class EditClassroom extends EditRecord
 
         if (in_array($type, ['announcement', 'event', 'homework'], true)) {
             $announcementType = $type === 'announcement' ? 'message' : $type;
-            $dateValue = $data['date'] ?? $data['due_date'] ?? null;
-            $dateData = $this->normalizeDateValue($dateValue);
-            $title = $this->computeAnnouncementTitle(
-                (string) ($data['title'] ?? $data['name'] ?? ''),
-                (string) ($data['content'] ?? $data['description'] ?? '')
-            );
+            $items = $this->normalizeAnnouncementItems($data);
+            foreach ($items as $item) {
+                $dateValue = $item['date'] ?? $item['due_date'] ?? null;
+                $dateData = $this->normalizeDateValue($dateValue);
+                $title = $this->computeAnnouncementTitle(
+                    (string) ($item['title'] ?? $item['name'] ?? ''),
+                    (string) ($item['content'] ?? $item['description'] ?? '')
+                );
 
-            Announcement::create([
-                'classroom_id' => $classroomId,
-                'user_id' => auth()->id(),
-                'type' => $announcementType,
-                'title' => $title,
-                'content' => (string) ($data['content'] ?? $data['description'] ?? ''),
-                'occurs_on_date' => $dateData['date'],
-                'day_of_week' => $dateData['day_of_week'],
-                'occurs_at_time' => $this->normalizeTime($data['time'] ?? null),
-                'location' => (string) ($data['location'] ?? ''),
-            ]);
+                Announcement::create([
+                    'classroom_id' => $classroomId,
+                    'user_id' => auth()->id(),
+                    'type' => $announcementType,
+                    'title' => $title,
+                    'content' => (string) ($item['content'] ?? $item['description'] ?? ''),
+                    'occurs_on_date' => $dateData['date'],
+                    'day_of_week' => $dateData['day_of_week'],
+                    'occurs_at_time' => $this->normalizeTime($item['time'] ?? null),
+                    'location' => (string) ($item['location'] ?? ''),
+                ]);
+            }
 
-            return 'Announcement created';
+            return 'Announcements created';
         }
 
         return 'No content created';
@@ -438,8 +463,19 @@ class EditClassroom extends EditRecord
         }
 
         $date = $this->normalizeDate($text);
+        if ($date) {
+            return ['date' => $date, 'day_of_week' => null];
+        }
 
-        return ['date' => $date, 'day_of_week' => null];
+        $dayMatch = $this->extractHebrewDay($text);
+        if ($dayMatch !== null) {
+            return [
+                'date' => $this->resolveHebrewDayDate($dayMatch, $text),
+                'day_of_week' => null,
+            ];
+        }
+
+        return ['date' => null, 'day_of_week' => null];
     }
 
     /**
@@ -458,6 +494,87 @@ class EditClassroom extends EditRecord
         }
 
         return mb_substr($contentText, 0, self::ANNOUNCEMENT_TITLE_MAX_LENGTH);
+    }
+
+    /**
+     * Normalize contact items from AI response.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function normalizeContactItems(array $data): array
+    {
+        if (!empty($data['contacts']) && is_array($data['contacts'])) {
+            return array_values(array_filter($data['contacts'], 'is_array'));
+        }
+
+        if (!empty($data['items']) && is_array($data['items'])) {
+            return array_values(array_filter($data['items'], 'is_array'));
+        }
+
+        return [$data];
+    }
+
+    /**
+     * Normalize announcement items from AI response.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function normalizeAnnouncementItems(array $data): array
+    {
+        if (!empty($data['items']) && is_array($data['items'])) {
+            return array_values(array_filter($data['items'], 'is_array'));
+        }
+
+        if (!empty($data['tasks']) && is_array($data['tasks'])) {
+            return array_map(function ($task): array {
+                return [
+                    'title' => is_string($task) ? $task : '',
+                    'content' => '',
+                ];
+            }, $data['tasks']);
+        }
+
+        return [$data];
+    }
+
+    /**
+     * Extract a Hebrew day name from input text.
+     */
+    protected function extractHebrewDay(string $text): ?string
+    {
+        foreach (array_keys(self::HEBREW_DAYS) as $dayName) {
+            if (str_contains($text, $dayName)) {
+                return $dayName;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Resolve a Hebrew day name into a date string.
+     */
+    protected function resolveHebrewDayDate(string $dayName, string $text): ?string
+    {
+        if (!isset(self::HEBREW_DAYS[$dayName])) {
+            return null;
+        }
+
+        $timezone = $this->getClassroomTimezone();
+        $now = Carbon::now($timezone);
+        $useNextWeek = str_contains($text, 'הבא');
+
+        $target = $useNextWeek ? $now->copy()->next(self::HEBREW_DAYS[$dayName]) : $now->copy()->nextOrSame(self::HEBREW_DAYS[$dayName]);
+
+        return $target->format('Y-m-d');
+    }
+
+    /**
+     * Get the classroom timezone.
+     */
+    protected function getClassroomTimezone(): string
+    {
+        return $this->record?->timezone ?? config('app.timezone');
     }
 
     /**
