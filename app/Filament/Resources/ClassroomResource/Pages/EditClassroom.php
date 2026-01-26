@@ -263,14 +263,10 @@ class EditClassroom extends EditRecord
                 NotificationAction::make('confirm')
                     ->label('Confirm & Create')
                     ->button()
-                    ->action(function (): void {
-                        $this->confirmAiSuggestion();
-                    }),
+                    ->action('confirmAiSuggestion'),
                 NotificationAction::make('retry')
                     ->label('Retry')
-                    ->action(function (): void {
-                        $this->retryAiSuggestion();
-                    }),
+                    ->action('retryAiSuggestion'),
             ])
             ->persistent()
             ->send();
