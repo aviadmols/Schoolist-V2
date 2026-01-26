@@ -18,6 +18,7 @@ use Filament\Resources\Pages\EditRecord;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Attributes\On;
 
 class EditClassroom extends EditRecord
 {
@@ -139,6 +140,7 @@ class EditClassroom extends EditRecord
     /**
      * Confirm AI suggestion and create content.
      */
+    #[On('confirm-ai-suggestion')]
     public function confirmAiSuggestion(): void
     {
         if (!$this->aiSuggestion) {
@@ -182,6 +184,7 @@ class EditClassroom extends EditRecord
     /**
      * Retry AI analysis.
      */
+    #[On('retry-ai-suggestion')]
     public function retryAiSuggestion(): void
     {
         $this->aiSuggestion = null;
@@ -263,10 +266,10 @@ class EditClassroom extends EditRecord
                 NotificationAction::make('confirm')
                     ->label('Confirm & Create')
                     ->button()
-                    ->action('confirmAiSuggestion'),
+                    ->dispatch('confirm-ai-suggestion'),
                 NotificationAction::make('retry')
                     ->label('Retry')
-                    ->action('retryAiSuggestion'),
+                    ->dispatch('retry-ai-suggestion'),
             ])
             ->persistent()
             ->send();
