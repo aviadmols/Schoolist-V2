@@ -13,6 +13,7 @@ use App\Services\Announcements\AnnouncementFeedService;
 use App\Services\Builder\TemplateRenderer;
 use App\Services\Classroom\HolidayService;
 use App\Services\Classroom\TimetableService;
+use App\Services\Weather\WeatherService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
 
@@ -59,14 +60,47 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
     $classroom->load(['city', 'school']);
     $user = auth()->user();
     $today = Carbon::now($classroom->timezone);
-    $selectedDay = (int) request()->query('day', $today->dayOfWeek);
+    
+    // Advanced day logic: if hour >= 16:00, show tomorrow
+    $baseDay = $today->hour >= 16 ? ($today->dayOfWeek + 1) % 7 : $today->dayOfWeek;
+    $selectedDay = (int) request()->query('day', $baseDay);
+    
+    // Check if selected day is active, if not find next active day
+    $activeDays = $classroom->active_days ?? [];
+    if (!empty($activeDays) && !in_array($selectedDay, $activeDays)) {
+        for ($i = 1; $i <= 7; $i++) {
+            $nextDay = ($selectedDay + $i) % 7;
+            if (in_array($nextDay, $activeDays)) {
+                $selectedDay = $nextDay;
+                break;
+            }
+        }
+    }
+    
     $timetableService = app(TimetableService::class);
     $announcementService = app(AnnouncementFeedService::class);
     $holidayService = app(HolidayService::class);
+    $weatherService = app(WeatherService::class);
     $holidays = $holidayService->getUpcomingHolidays($classroom);
     $dayLabels = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
     $dayNames = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
     $canManage = false;
+    
+    // Get time-based greeting
+    $getTimeBasedGreeting = function (int $hour): string {
+        if ($hour >= 5 && $hour < 12) {
+            return 'בוקר טוב';
+        } elseif ($hour >= 12 && $hour < 16) {
+            return 'צוהריים טובים';
+        } elseif ($hour >= 16 && $hour < 19) {
+            return 'אחר צהריים טובים';
+        } elseif ($hour >= 19 && $hour < 23) {
+            return 'ערב טוב';
+        } else {
+            return 'לילה טוב';
+        }
+    };
+    $greeting = $getTimeBasedGreeting($today->hour);
 
     if ($user) {
         $canManage = $user->role === 'site_admin'
@@ -180,6 +214,13 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
 
     $eventList = $eventAnnouncements
         ->map(function (array $announcement) use ($formatDate, $formatTime): array {
+            $announcementModel = \App\Models\Announcement::find($announcement['id'] ?? null);
+            $createdBy = null;
+            if ($announcementModel && $announcementModel->creator) {
+                $creator = $announcementModel->creator;
+                $createdBy = $creator->name ?? ($creator->phone ?? 'משתמש');
+            }
+            
             return [
                 'id' => $announcement['id'] ?? null,
                 'type' => $announcement['type'] ?? 'event',
@@ -188,6 +229,7 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
                 'date' => $formatDate($announcement['occurs_on_date'] ?? null),
                 'time' => $formatTime($announcement['occurs_at_time'] ?? null),
                 'location' => $announcement['location'] ?? '',
+                'created_by' => $createdBy,
             ];
         })
         ->values()
@@ -208,7 +250,20 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
         'day_names' => $dayNames,
         'timetable' => $timetableService->getWeeklyTimetable($classroom),
         'announcements' => $announcements
-            ->map(function (array $announcement) use ($formatDate, $formatTime): array {
+            ->map(function (array $announcement) use ($formatDate, $formatTime, $user): array {
+                $announcementModel = \App\Models\Announcement::find($announcement['id'] ?? null);
+                $isDone = false;
+                if ($announcementModel && $user) {
+                    $status = $announcementModel->currentUserStatus;
+                    $isDone = $status && $status->done_at !== null;
+                }
+                
+                $createdBy = null;
+                if ($announcementModel && $announcementModel->creator) {
+                    $creator = $announcementModel->creator;
+                    $createdBy = $creator->name ?? ($creator->phone ?? 'משתמש');
+                }
+                
                 return [
                     'id' => $announcement['id'] ?? null,
                     'type' => $announcement['type'] ?? 'message',
@@ -217,6 +272,8 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
                     'date' => $formatDate($announcement['occurs_on_date'] ?? null),
                     'time' => $formatTime($announcement['occurs_at_time'] ?? null),
                     'location' => $announcement['location'] ?? '',
+                    'is_done' => $isDone,
+                    'created_by' => $createdBy,
                 ];
             })
             ->values()
@@ -242,24 +299,21 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
             })
             ->values()
             ->all(),
-        'children' => $classroom->children()
-            ->orderBy('name', 'asc')
-            ->get()
-            ->map(function (\App\Models\Child $child): array {
-                return [
-                    'name' => $child->name,
-                    'birth_date' => $child->birth_date?->format('d.m.Y'),
-                ];
-            })
-            ->values()
-            ->all(),
         'holidays' => $holidays
+            ->filter(function ($holiday) use ($today) {
+                // Filter out past holidays
+                return $holiday->end_date && $holiday->end_date->greaterThanOrEqualTo($today);
+            })
+            ->sortBy(function ($holiday) {
+                return $holiday->start_date?->timestamp ?? 0;
+            })
             ->map(function ($holiday): array {
                 return [
                     'name' => $holiday->name,
                     'start_date' => $holiday->start_date?->format('d.m.Y'),
                     'end_date' => $holiday->end_date?->format('d.m.Y'),
                     'description' => $holiday->description,
+                    'has_kitan' => $holiday->has_kitan ?? false,
                 ];
             })
             ->values()
@@ -277,7 +331,89 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
             })
             ->values()
             ->all(),
-        'weather_text' => '16-20° - מזג אוויר נוח.',
+        'children' => $classroom->children()
+            ->orderBy('name', 'asc')
+            ->get()
+            ->map(function (\App\Models\Child $child): array {
+                $contacts = $child->contacts()
+                    ->orderBy('name', 'asc')
+                    ->get()
+                    ->map(function (\App\Models\ChildContact $contact): array {
+                        return [
+                            'name' => $contact->name,
+                            'phone' => $contact->phone,
+                            'relation' => $contact->relation,
+                        ];
+                    })
+                    ->values()
+                    ->all();
+                
+                return [
+                    'id' => $child->id,
+                    'name' => $child->name,
+                    'birth_date' => $child->birth_date?->format('d.m.Y'),
+                    'contacts' => $contacts,
+                ];
+            })
+            ->values()
+            ->all(),
+        'weather' => $weatherService->getWeatherForClassroom($classroom),
+        'weather_text' => $weatherService->getWeatherForClassroom($classroom)['text'] ?? '16-20° - מזג אוויר נוח.',
+        'greeting' => $greeting,
+        'upcoming_birthdays' => $classroom->children()
+            ->whereNotNull('birth_date')
+            ->get()
+            ->map(function (\App\Models\Child $child) use ($today): ?array {
+                $birthDate = $child->birth_date;
+                if (!$birthDate) {
+                    return null;
+                }
+                
+                $thisYearBirthday = Carbon::create($today->year, $birthDate->month, $birthDate->day, 0, 0, 0, $today->timezone);
+                $nextYearBirthday = Carbon::create($today->year + 1, $birthDate->month, $birthDate->day, 0, 0, 0, $today->timezone);
+                
+                $weekEnd = $today->copy()->addWeek();
+                
+                if ($thisYearBirthday->between($today, $weekEnd)) {
+                    return [
+                        'name' => $child->name,
+                        'date' => $thisYearBirthday->format('d.m.Y'),
+                        'days_until' => $today->diffInDays($thisYearBirthday, false),
+                    ];
+                }
+                
+                if ($nextYearBirthday->between($today, $weekEnd)) {
+                    return [
+                        'name' => $child->name,
+                        'date' => $nextYearBirthday->format('d.m.Y'),
+                        'days_until' => $today->diffInDays($nextYearBirthday, false),
+                    ];
+                }
+                
+                return null;
+            })
+            ->filter()
+            ->sortBy('days_until')
+            ->values()
+            ->all(),
+        'classroom_admins' => $classroom->users()
+            ->wherePivotIn('role', ['owner', 'admin'])
+            ->orWhereIn('users.id', $classroom->classroom_admins ?? [])
+            ->get()
+            ->map(function (\App\Models\User $admin): array {
+                return [
+                    'id' => $admin->id,
+                    'name' => $admin->name,
+                    'phone' => $admin->phone,
+                ];
+            })
+            ->values()
+            ->all(),
+        'current_user' => $user ? [
+            'id' => $user->id,
+            'name' => $user->name,
+            'phone' => $user->phone,
+        ] : null,
         'timetable_image' => $timetableService->getTimetableImageUrl($classroom),
         'can_manage' => $canManage,
         'admin_edit_url' => $canManage ? url("/admin/classrooms/{$classroom->id}/edit") : null,

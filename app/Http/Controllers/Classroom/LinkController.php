@@ -41,15 +41,24 @@ class LinkController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $classroom = $request->attributes->get('current_classroom');
+        $user = auth()->user();
+
+        // Check publishing permissions
+        if (!$this->canPublish($classroom, $user)) {
+            abort(403, 'You do not have permission to publish links.');
+        }
 
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
-            'url' => ['required', 'url', 'max:255'],
+            'url' => ['nullable', 'url', 'max:255'],
+            'file_path' => ['nullable', 'string'],
+            'category' => ['nullable', 'string'],
             'sort_order' => ['nullable', 'integer'],
         ]);
 
         $link = ClassLink::create(array_merge($data, [
             'classroom_id' => $classroom->id,
+            'created_by_user_id' => $user->id,
         ]));
 
         $this->auditService->log('link.created', $link, null, $link->toArray(), $classroom->id);
@@ -97,5 +106,36 @@ class LinkController extends Controller
         $link->delete();
 
         return back()->with('success', 'Link removed.');
+    }
+
+    /**
+     * Check if user can publish to classroom.
+     *
+     * @param Classroom $classroom
+     * @param \App\Models\User|null $user
+     * @return bool
+     */
+    private function canPublish(Classroom $classroom, ?\App\Models\User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        // Site admin can always publish
+        if ($user->role === 'site_admin') {
+            return true;
+        }
+
+        // If member posting is allowed, anyone can publish
+        if ($classroom->allow_member_posting ?? true) {
+            return true;
+        }
+
+        // Otherwise, only classroom admins can publish
+        $membership = $classroom->users()->where('user_id', $user->id)->first();
+        $isAdmin = $membership && in_array($membership->pivot->role, ['owner', 'admin']);
+        $isClassroomAdmin = in_array($user->id, $classroom->classroom_admins ?? []);
+
+        return $isAdmin || $isClassroomAdmin;
     }
 }

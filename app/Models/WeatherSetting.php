@@ -2,34 +2,27 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\CreatesWithUser;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Holiday extends Model
+class WeatherSetting extends Model
 {
-    use CreatesWithUser;
-
     /** @var array<int, string> */
     protected $fillable = [
         'classroom_id',
-        'created_by_user_id',
-        'name',
-        'start_date',
-        'end_date',
-        'description',
-        'has_kitan',
+        'api_provider',
+        'api_key',
+        'city_name',
+        'icon_mapping',
     ];
 
     /** @var array<string, string> */
     protected $casts = [
-        'start_date' => 'date',
-        'end_date' => 'date',
-        'has_kitan' => 'boolean',
+        'icon_mapping' => 'array',
     ];
 
     /**
-     * The classroom this holiday belongs to.
+     * The classroom this weather setting belongs to.
      */
     public function classroom(): BelongsTo
     {

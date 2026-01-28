@@ -221,6 +221,15 @@ class EditClassroom extends EditRecord
     protected function buildContentAnalyzerPrompt(string $basePrompt, string $text): string
     {
         $prompt = trim($basePrompt);
+        
+        // Add current date and time context
+        $now = \Carbon\Carbon::now($this->record->timezone ?? 'Asia/Jerusalem');
+        $prompt .= "\n\nCURRENT_DATE_AND_TIME:\n";
+        $prompt .= "Date: ".$now->format('d.m.Y')."\n";
+        $prompt .= "Time: ".$now->format('H:i')."\n";
+        $prompt .= "Day of week: ".$now->format('l')." (".['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'][$now->dayOfWeek].")\n";
+        $prompt .= "Use this context to calculate future dates when needed.";
+        
         if ($text !== '') {
             $prompt .= "\n\nINPUT_TEXT:\n".$text;
         }

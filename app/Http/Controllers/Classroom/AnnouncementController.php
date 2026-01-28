@@ -45,6 +45,12 @@ class AnnouncementController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $classroom = $request->attributes->get('current_classroom');
+        $user = auth()->user();
+
+        // Check publishing permissions
+        if (!$this->canPublish($classroom, $user)) {
+            abort(403, 'You do not have permission to publish announcements.');
+        }
 
         $data = $request->validate([
             'type' => ['required', 'in:message,homework,event'],
@@ -56,12 +62,43 @@ class AnnouncementController extends Controller
 
         $announcement = Announcement::create(array_merge($data, [
             'classroom_id' => $classroom->id,
-            'user_id' => auth()->id(),
+            'user_id' => $user->id,
         ]));
 
         $this->auditService->log('announcement.created', $announcement, null, $announcement->toArray(), $classroom->id);
 
         return back()->with('success', 'Announcement created.');
+    }
+
+    /**
+     * Check if user can publish to classroom.
+     *
+     * @param Classroom $classroom
+     * @param \App\Models\User|null $user
+     * @return bool
+     */
+    private function canPublish(Classroom $classroom, ?\App\Models\User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        // Site admin can always publish
+        if ($user->role === 'site_admin') {
+            return true;
+        }
+
+        // If member posting is allowed, anyone can publish
+        if ($classroom->allow_member_posting ?? true) {
+            return true;
+        }
+
+        // Otherwise, only classroom admins can publish
+        $membership = $classroom->users()->where('user_id', $user->id)->first();
+        $isAdmin = $membership && in_array($membership->pivot->role, ['owner', 'admin']);
+        $isClassroomAdmin = in_array($user->id, $classroom->classroom_admins ?? []);
+
+        return $isAdmin || $isClassroomAdmin;
     }
 
     /**

@@ -252,10 +252,26 @@ class TemplateManager
     <div class="card-header">
       <div class="card-title">
         יום <span id="selected-day-name">{{ ($page['day_names'] ?? ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'])[(int) ($page['selected_day'] ?? 0)] ?? '' }}</span>
-        <span class="card-title-light">בוקר טוב!</span>
+        <span class="card-title-light">{{ $page['greeting'] ?? 'בוקר טוב' }}!</span>
       </div>
       <img src="https://app.schoolist.co.il/storage/media/assets/u4GUGAJ888XuMp1EI4roXPiQ996DzG95qiohqyID.svg" class="icon-edit-small" alt="">
     </div>
+
+    @if (!empty($page['upcoming_birthdays']))
+      <div style="padding: 12px 20px; background: #fff3cd; border-bottom: 1px solid #ffeaa7; margin-bottom: 0;">
+        <div style="font-weight: bold; margin-bottom: 4px;">🎂 ימי הולדת קרובים:</div>
+        @foreach ($page['upcoming_birthdays'] as $birthday)
+          <div style="font-size: 0.9em; color: #666;">
+            {{ $birthday['name'] ?? '' }} - {{ $birthday['date'] ?? '' }}
+            @if (!empty($birthday['days_until']) && $birthday['days_until'] == 0)
+              <span style="color: var(--blue-primary);">היום!</span>
+            @elseif (!empty($birthday['days_until']))
+              <span style="color: #666;">(בעוד {{ $birthday['days_until'] }} ימים)</span>
+            @endif
+          </div>
+        @endforeach
+      </div>
+    @endif
 
     <div id="schedule-content" class="schedule-list">
       @php
@@ -279,8 +295,13 @@ class TemplateManager
   </div>
 
   <div class="card" style="display:flex; justify-content:space-between; align-items:center; padding:12px 20px;">
-    <span class="weather-text">{{ $page['weather_text'] ?? '16-20° - מזג אוויר נוח.' }}</span>
-    <span style="font-size:24px;">☀️</span>
+    <div style="flex: 1;">
+      <div class="weather-text">{{ $page['weather']['text'] ?? ($page['weather_text'] ?? '16-20° - מזג אוויר נוח.') }}</div>
+      @if (!empty($page['weather']['recommendation']))
+        <div style="font-size: 0.85em; color: #666; margin-top: 4px;">{{ $page['weather']['recommendation'] }}</div>
+      @endif
+    </div>
+    <span style="font-size:24px;">{{ $page['weather']['icon'] ?? '☀️' }}</span>
   </div>
 
   <div class="card" style="padding-bottom: 70px;">
@@ -291,7 +312,7 @@ class TemplateManager
       @if (!empty($page['announcements']))
         @foreach ($page['announcements'] as $announcement)
           <div
-            class="notice-row"
+            class="notice-row {{ !empty($announcement['is_done']) ? 'notice-done' : '' }}"
             data-item-popup="popup-content"
             data-item-type="{{ $announcement['type'] ?? 'message' }}"
             data-item-title="{{ $announcement['title'] ?? '' }}"
@@ -299,9 +320,14 @@ class TemplateManager
             data-item-date="{{ $announcement['date'] ?? '' }}"
             data-item-time="{{ $announcement['time'] ?? '' }}"
             data-item-location="{{ $announcement['location'] ?? '' }}"
+            data-announcement-id="{{ $announcement['id'] ?? '' }}"
+            data-is-done="{{ !empty($announcement['is_done']) ? '1' : '0' }}"
           >
-            <span style="color: var(--blue-primary);">✓</span>
-            <span>{{ $announcement['title'] ?? ($announcement['content'] ?? '') }}</span>
+            <span class="notice-check" style="color: var(--blue-primary); cursor: pointer;">✓</span>
+            <span class="notice-text">{{ $announcement['title'] ?? ($announcement['content'] ?? '') }}</span>
+            @if (!empty($announcement['created_by']))
+              <span style="font-size: 0.8em; color: #999; margin-right: 8px;">פורסם על ידי: {{ $announcement['created_by'] }}</span>
+            @endif
           </div>
         @endforeach
       @else
@@ -333,6 +359,7 @@ class TemplateManager
             data-item-date="{{ $event['date'] ?? '' }}"
             data-item-time="{{ $event['time'] ?? '' }}"
             data-item-location="{{ $event['location'] ?? '' }}"
+            data-event-id="{{ $event['id'] ?? '' }}"
           >
             <img src="https://cdn-icons-png.flaticon.com/512/2948/2948088.png" class="calendar-icon" alt="">
             <div class="event-content">
@@ -342,7 +369,13 @@ class TemplateManager
                 @if (!empty($event['time'])) <span>{{ $event['time'] }}</span> @endif
                 @if (!empty($event['location'])) <span>{{ $event['location'] }}</span> @endif
               </div>
+              @if (!empty($event['created_by']))
+                <div style="font-size: 0.8em; color: #999; margin-top: 4px;">פורסם על ידי: {{ $event['created_by'] }}</div>
+              @endif
             </div>
+            @if (!empty($event['date']) || !empty($event['time']))
+              <button type="button" class="add-to-calendar-btn" data-event-date="{{ $event['date'] ?? '' }}" data-event-time="{{ $event['time'] ?? '' }}" data-event-title="{{ $event['title'] ?? '' }}" data-event-location="{{ $event['location'] ?? '' }}" title="הוסף ליומן">📅</button>
+            @endif
           </div>
         @endforeach
       @else
@@ -411,6 +444,44 @@ class TemplateManager
       <img src="https://app.schoolist.co.il/storage/media/assets/u4GUGAJ888XuMp1EI4roXPiQ996DzG95qiohqyID.svg" class="icon-edit-small" alt="">
     </div>
   </div>
+
+  @if (!empty($page['current_user']))
+    <div class="card" style="margin-top: 20px;">
+      <div class="card-header">
+        <div class="card-title">פרטי המשתמש</div>
+      </div>
+      <div style="padding: 12px 20px;">
+        <div style="font-weight: bold;">{{ $page['current_user']['name'] ?? '' }}</div>
+        @if (!empty($page['current_user']['phone']))
+          <div style="font-size: 0.9em; color: #666; margin-top: 4px;">{{ $page['current_user']['phone'] }}</div>
+        @endif
+      </div>
+    </div>
+  @endif
+
+  @if (!empty($page['classroom_admins']))
+    <div class="card" style="margin-top: 20px;">
+      <div class="card-header">
+        <div class="card-title">מנהלי הכיתה</div>
+      </div>
+      <div style="padding: 12px 20px;">
+        @foreach ($page['classroom_admins'] as $admin)
+          <div style="margin-bottom: 8px;">
+            @if (!empty($admin['phone']))
+              <a href="https://wa.me/{{ str_replace(['+', '-', ' ', '(', ')'], '', $admin['phone']) }}" target="_blank" style="font-weight: bold; text-decoration: none; color: inherit;">
+                {{ $admin['name'] ?? '' }}
+              </a>
+            @else
+              <span style="font-weight: bold;">{{ $admin['name'] ?? '' }}</span>
+            @endif
+            @if (!empty($admin['phone']))
+              <span style="font-size: 0.9em; color: #666; margin-right: 8px;">{{ $admin['phone'] }}</span>
+            @endif
+          </div>
+        @endforeach
+      </div>
+    </div>
+  @endif
 
   <footer class="footer">
     <div class="logo-text">schoolist</div>
@@ -601,8 +672,171 @@ class TemplateManager
     });
 
     backdrop?.addEventListener('click', closePopups);
+
+    // Handle child contacts toggle
+    document.querySelectorAll('.child-name').forEach((nameEl) => {
+      nameEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const childRow = nameEl.closest('.child-row');
+        if (!childRow) return;
+        const childId = childRow.getAttribute('data-child-id');
+        const contactsEl = document.querySelector(`.child-contacts[data-child-id="${childId}"]`);
+        if (contactsEl) {
+          contactsEl.style.display = contactsEl.style.display === 'none' ? 'block' : 'none';
+        }
+      });
+    });
+
+    // Handle announcement toggle
+    document.querySelectorAll('.notice-check').forEach((checkEl) => {
+      checkEl.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const noticeRow = checkEl.closest('.notice-row');
+        if (!noticeRow) return;
+        const announcementId = noticeRow.getAttribute('data-announcement-id');
+        if (!announcementId) return;
+
+        const isDone = noticeRow.classList.contains('notice-done');
+        
+        try {
+          const response = await fetch(`/announcements/${announcementId}/done`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            },
+            credentials: 'same-origin',
+          });
+
+          if (response.ok) {
+            if (!isDone) {
+              noticeRow.classList.add('notice-done');
+              noticeRow.setAttribute('data-is-done', '1');
+              // Confetti effect
+              createConfetti();
+            } else {
+              noticeRow.classList.remove('notice-done');
+              noticeRow.setAttribute('data-is-done', '0');
+            }
+          }
+        } catch (error) {
+          console.error('Failed to toggle announcement:', error);
+        }
+      });
+    });
+
+    // Handle add to calendar
+    document.querySelectorAll('.add-to-calendar-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const date = btn.getAttribute('data-event-date') || '';
+        const time = btn.getAttribute('data-event-time') || '';
+        const title = btn.getAttribute('data-event-title') || '';
+        const location = btn.getAttribute('data-event-location') || '';
+
+        if (!date) return;
+
+        const [day, month, year] = date.split('.');
+        const [hours, minutes] = time ? time.split(':') : ['12', '00'];
+        const startDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hours), parseInt(minutes));
+        const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+
+        const formatICSDate = (date) => {
+          return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        };
+
+        const icsContent = [
+          'BEGIN:VCALENDAR',
+          'VERSION:2.0',
+          'PRODID:-//Schoolist//Classroom Events//EN',
+          'BEGIN:VEVENT',
+          `DTSTART:${formatICSDate(startDate)}`,
+          `DTEND:${formatICSDate(endDate)}`,
+          `SUMMARY:${title}`,
+          location ? `LOCATION:${location}` : '',
+          'END:VEVENT',
+          'END:VCALENDAR',
+        ].filter(Boolean).join('\r\n');
+
+        const blob = new Blob([icsContent], { type: 'text/calendar' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${title.replace(/[^a-z0-9]/gi, '_')}.ics`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      });
+    });
+
+    // Confetti effect function
+    function createConfetti() {
+      const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#6c5ce7'];
+      const confettiCount = 50;
+      
+      for (let i = 0; i < confettiCount; i++) {
+        const confetti = document.createElement('div');
+        confetti.style.position = 'fixed';
+        confetti.style.width = '8px';
+        confetti.style.height = '8px';
+        confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        confetti.style.left = Math.random() * 100 + '%';
+        confetti.style.top = '-10px';
+        confetti.style.borderRadius = '50%';
+        confetti.style.pointerEvents = 'none';
+        confetti.style.zIndex = '9999';
+        confetti.style.opacity = '0.9';
+        
+        document.body.appendChild(confetti);
+        
+        const animation = confetti.animate([
+          { transform: 'translateY(0) rotate(0deg)', opacity: 1 },
+          { transform: `translateY(${window.innerHeight + 100}px) rotate(720deg)`, opacity: 0 }
+        ], {
+          duration: 2000 + Math.random() * 1000,
+          easing: 'cubic-bezier(0.5, 0, 0.5, 1)',
+        });
+        
+        animation.onfinish = () => confetti.remove();
+      }
+    }
   })();
 </script>
+<style>
+  .notice-done .notice-text {
+    text-decoration: line-through;
+    opacity: 0.6;
+  }
+  .notice-done .notice-check {
+    color: #999 !important;
+  }
+  .add-to-calendar-btn {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px 8px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+  }
+  .add-to-calendar-btn:hover {
+    opacity: 1;
+  }
+  .child-contacts {
+    animation: slideDown 0.3s ease-out;
+  }
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      max-height: 0;
+    }
+    to {
+      opacity: 1;
+      max-height: 500px;
+    }
+  }
+</style>
 HTML;
     }
 
@@ -963,7 +1197,12 @@ HTML;
   @if (!empty($page['holidays']))
     @foreach ($page['holidays'] as $holiday)
       <div class="sb-row">
-        <span>{{ $holiday['name'] ?? '' }}</span>
+        <span>
+          {{ $holiday['name'] ?? '' }}
+          @if (!empty($holiday['has_kitan']) && $holiday['has_kitan'])
+            <span style="color: var(--blue-primary); margin-right: 4px;">🎒</span>
+          @endif
+        </span>
         <span>
           @if (!empty($holiday['start_date']))
             {{ $holiday['start_date'] }}
@@ -988,12 +1227,28 @@ HTML;
     {
         return <<<'HTML'
 <p>רשימת הילדים בכיתה.</p>
-<div class="sb-list">
+<div class="sb-list" id="children-list">
   @if (!empty($page['children']))
     @foreach ($page['children'] as $child)
-      <div class="sb-row">
-        <span>{{ $child['name'] ?? '' }}</span>
+      <div class="sb-row child-row" data-child-id="{{ $child['id'] ?? '' }}">
+        <span class="child-name" style="cursor: pointer; font-weight: bold;">{{ $child['name'] ?? '' }}</span>
         <span>{{ $child['birth_date'] ?? '' }}</span>
+      </div>
+      <div class="child-contacts" data-child-id="{{ $child['id'] ?? '' }}" style="display: none; padding-right: 20px; margin-top: 8px;">
+        @if (!empty($child['contacts']))
+          @foreach ($child['contacts'] as $contact)
+            <div class="sb-row" style="font-size: 0.9em; color: #666;">
+              <span>{{ $contact['name'] ?? '' }} ({{ $contact['relation'] ?? '' }})</span>
+              <span>
+                @if (!empty($contact['phone']))
+                  <a href="tel:{{ $contact['phone'] }}" style="margin-left: 8px;">📞</a>
+                  <a href="https://wa.me/{{ str_replace(['+', '-', ' ', '(', ')'], '', $contact['phone']) }}" target="_blank" style="margin-left: 4px;">💬</a>
+                  <a href="tel:{{ $contact['phone'] }}?add" style="margin-left: 4px;">➕</a>
+                @endif
+              </span>
+            </div>
+          @endforeach
+        @endif
       </div>
     @endforeach
   @else
@@ -1037,8 +1292,16 @@ HTML;
   @if (!empty($page['important_contacts']))
     @foreach ($page['important_contacts'] as $contact)
       <div class="sb-row">
-        <span>{{ $contact['name'] ?? '' }}</span>
-        <span>{{ $contact['phone'] ?? ($contact['email'] ?? '') }}</span>
+        <span>{{ $contact['name'] ?? '' }} @if (!empty($contact['role']))<span style="color: #666; font-size: 0.9em;">({{ $contact['role'] }})</span>@endif</span>
+        <span>
+          @if (!empty($contact['phone']))
+            <a href="tel:{{ $contact['phone'] }}" style="margin-left: 8px;">{{ $contact['phone'] }}</a>
+            <a href="https://wa.me/{{ str_replace(['+', '-', ' ', '(', ')'], '', $contact['phone']) }}" target="_blank" style="margin-left: 4px;">💬</a>
+            <a href="tel:{{ $contact['phone'] }}?add" style="margin-left: 4px;">➕</a>
+          @elseif (!empty($contact['email']))
+            <a href="mailto:{{ $contact['email'] }}">{{ $contact['email'] }}</a>
+          @endif
+        </span>
       </div>
     @endforeach
   @else
