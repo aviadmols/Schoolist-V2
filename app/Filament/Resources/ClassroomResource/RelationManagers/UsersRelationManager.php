@@ -21,7 +21,8 @@ class UsersRelationManager extends RelationManager
                 Forms\Components\TextInput::make('name')
                     ->required()
                     ->disabled(),
-                Forms\Components\Select::make('role')
+                Forms\Components\Select::make('pivot.role')
+                    ->label('Role')
                     ->options([
                         'owner' => 'Owner',
                         'admin' => 'Admin',
@@ -37,7 +38,8 @@ class UsersRelationManager extends RelationManager
             ->columns([
                 Tables\Columns\TextColumn::make('name'),
                 Tables\Columns\TextColumn::make('email'),
-                Tables\Columns\TextColumn::make('role')
+                Tables\Columns\TextColumn::make('pivot.role')
+                    ->label('Role')
                     ->badge(),
             ])
             ->filters([
