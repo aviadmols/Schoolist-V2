@@ -249,12 +249,12 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
                 ->values()
                 ->all(),
             'children' => $classroom->children()
+                ->with('contacts')
                 ->orderBy('name', 'asc')
                 ->get()
                 ->map(function (\App\Models\Child $child): array {
-                    $contacts = $child->contacts()
-                        ->orderBy('name', 'asc')
-                        ->get()
+                    $contacts = $child->contacts
+                        ->sortBy('name')
                         ->map(function (\App\Models\ChildContact $contact): array {
                             return [
                                 'name' => $contact->name,

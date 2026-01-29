@@ -10,11 +10,17 @@ class ClassroomContextService
     /** @var string */
     private const SESSION_KEY = 'current_classroom_id';
 
+    private ?Classroom $currentClassroom = null;
+
     /**
      * Get the current classroom from context.
      */
     public function getCurrentClassroom(): ?Classroom
     {
+        if ($this->currentClassroom !== null) {
+            return $this->currentClassroom;
+        }
+
         $id = Session::get(self::SESSION_KEY);
 
         if (!$id && auth()->check()) {
@@ -25,7 +31,7 @@ class ClassroomContextService
             return null;
         }
 
-        return Classroom::with(['city', 'school'])->find($id);
+        return $this->currentClassroom = Classroom::with(['city', 'school'])->find($id);
     }
 
     /**

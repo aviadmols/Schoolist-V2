@@ -99,10 +99,12 @@ class TemplateRenderer
             return self::$templateCache[$key];
         }
 
-        return self::$templateCache[$key] = BuilderTemplate::query()
+        $template = BuilderTemplate::query()
             ->where('scope', config('builder.scope'))
             ->where('key', $key)
             ->first();
+
+        return self::$templateCache[$key] = $template;
     }
 
     /**
@@ -377,8 +379,8 @@ HTML;
 
         return [
             'html' => Blade::render($parts['html'], $filteredData),
-            'css' => $parts['css'] ? Blade::render($parts['css'], $filteredData) : null,
-            'js' => $parts['js'] ? Blade::render($parts['js'], $filteredData) : null,
+            'css' => ($parts['css'] && str_contains($parts['css'], '{{')) ? Blade::render($parts['css'], $filteredData) : $parts['css'],
+            'js' => ($parts['js'] && str_contains($parts['js'], '{{')) ? Blade::render($parts['js'], $filteredData) : $parts['js'],
         ];
     }
 
