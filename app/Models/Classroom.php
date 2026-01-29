@@ -212,5 +212,6 @@ class Classroom extends Model
      */
     public function weatherSetting(): HasOne
     {
-        return $this->hasOne(WeatherSetting::class);
+        return $this->hasOne(\App\Models\WeatherSetting::class);
     }
+}
