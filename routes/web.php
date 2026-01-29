@@ -60,6 +60,15 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
     $classroom->load(['city', 'school']);
     $user = auth()->user();
     $today = Carbon::now($classroom->timezone);
+    $canManage = false;
+
+    if ($user) {
+        $canManage = $user->role === 'site_admin'
+            || $classroom->users()
+                ->where('users.id', $user->id)
+                ->wherePivotIn('role', ['owner', 'admin'])
+                ->exists();
+    }
     
     // Advanced day logic: if hour >= 16:00, show tomorrow
     $baseDay = $today->hour >= 16 ? ($today->dayOfWeek + 1) % 7 : $today->dayOfWeek;
@@ -101,14 +110,6 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
         }
     };
     $greeting = $getTimeBasedGreeting($today->hour);
-
-    if ($user) {
-        $canManage = $user->role === 'site_admin'
-            || $classroom->users()
-                ->where('users.id', $user->id)
-                ->wherePivotIn('role', ['owner', 'admin'])
-                ->exists();
-    }
 
     $mapHolidays = function (Carbon $from, Carbon $to) use ($holidays): array {
         return $holidays
