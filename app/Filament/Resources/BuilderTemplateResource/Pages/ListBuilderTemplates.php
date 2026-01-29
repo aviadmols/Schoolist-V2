@@ -6,6 +6,7 @@ use App\Filament\Resources\BuilderTemplateResource;
 use App\Services\Builder\TemplateManager;
 use Filament\Actions;
 use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 
 class ListBuilderTemplates extends ListRecords
@@ -39,7 +40,7 @@ class ListBuilderTemplates extends ListRecords
                     $templateManager = app(TemplateManager::class);
                     $templateManager->ensureDefaultTemplates();
                     
-                    $this->notification()
+                    Notification::make()
                         ->title('Popups Refreshed')
                         ->success()
                         ->send();
