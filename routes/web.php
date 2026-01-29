@@ -235,7 +235,7 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
         ->values()
         ->all();
 
-    $pageData = Cache::remember("classroom.page.data.{$classroom->id}.{$selectedDay}", 300, function () use ($classroom, $selectedDay, $today, $timetableService, $announcementService, $weatherService, $user, $greeting, $dayLabels, $dayNames, $formatDate, $formatTime, $mapHolidays, $weekStart, $weekEnd, $holidays) {
+    $pageData = Cache::remember("classroom.page.data.{$classroom->id}.{$selectedDay}", 300, function () use ($classroom, $selectedDay, $today, $timetableService, $announcementService, $weatherService, $greeting, $dayLabels, $dayNames, $formatDate, $formatTime, $mapHolidays, $weekStart, $weekEnd, $holidays) {
         return [
             'school_year' => ($today->month >= 9 ? $today->year : $today->year - 1).'-'.(($today->month >= 9 ? $today->year : $today->year - 1) + 1),
             'classroom' => [
@@ -398,13 +398,15 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
                 })
                 ->values()
                 ->all(),
-            'current_user' => $user ? ['id' => $user->id, 'name' => $user->name, 'phone' => $user->phone] : null,
             'timetable_image' => $timetableService->getTimetableImageUrl($classroom),
-            'can_manage' => $canManage,
-            'admin_edit_url' => $canManage ? url("/admin/classrooms/{$classroom->id}/edit") : null,
             'share_link' => url("/class/{$classroom->id}"),
         ];
     });
+
+    // Add user-specific data after cache
+    $pageData['current_user'] = $user ? ['id' => $user->id, 'name' => $user->name, 'phone' => $user->phone] : null;
+    $pageData['can_manage'] = $canManage;
+    $pageData['admin_edit_url'] = $canManage ? url("/admin/classrooms/{$classroom->id}/edit") : null;
 
     $overrideParts = app(TemplateRenderer::class)->renderPublishedPartsByKey('classroom.page', [
         'user' => auth()->user(),
