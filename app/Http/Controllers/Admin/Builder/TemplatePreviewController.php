@@ -122,6 +122,17 @@ class TemplatePreviewController
             ->values()
             ->all();
 
+        $dayLabels = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
+        $dayNames = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+        
+        $getTimeBasedGreeting = function (int $hour): string {
+            if ($hour >= 5 && $hour < 12) return 'בוקר טוב';
+            if ($hour >= 12 && $hour < 16) return 'צוהריים טובים';
+            if ($hour >= 16 && $hour < 19) return 'אחר צהריים טובים';
+            if ($hour >= 19 && $hour < 23) return 'ערב טוב';
+            return 'לילה טוב';
+        };
+
         return [
             'school_year' => $this->getSchoolYearLabel($today),
             'classroom' => [
@@ -131,16 +142,32 @@ class TemplatePreviewController
                 'grade_number' => $classroom->grade_number,
                 'city_name' => $classroom->city?->name,
                 'school_name' => $classroom->school?->name,
+                'allow_member_posting' => $classroom->allow_member_posting,
             ],
             'selected_day' => $selectedDay,
-            'day_labels' => ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'],
+            'day_labels' => $dayLabels,
+            'day_names' => $dayNames,
+            'greeting' => $getTimeBasedGreeting($today->hour),
             'timetable' => $timetable,
             'announcements' => $announcements,
             'events_today' => $this->filterHolidaysByRange($holidays, $today, $today),
             'events_week' => $this->filterHolidaysByRange($holidays, $today->copy()->startOfWeek(), $today->copy()->endOfWeek()),
             'links' => $links,
             'important_contacts' => $contacts,
-            'weather_text' => '16-20° - מזג אוויר נוח.',
+            'weather' => [
+                'text' => '22° - מעונן חלקית',
+                'icon' => '⛅',
+                'recommendation' => 'חולצה קצרה ומכנסיים דקים.',
+                'temperature' => 22.0,
+            ],
+            'weather_text' => '22° - מעונן חלקית',
+            'upcoming_birthdays' => [],
+            'classroom_admins' => [],
+            'current_user' => $user ? ['id' => $user->id, 'name' => $user->name, 'phone' => $user->phone] : null,
+            'can_manage' => true,
+            'admin_edit_url' => url("/admin/classrooms/{$classroom->id}/edit"),
+            'share_link' => url("/class/{$classroom->id}"),
+            'timetable_image' => null,
         ];
     }
 

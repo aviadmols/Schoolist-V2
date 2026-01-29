@@ -761,7 +761,7 @@ class TemplateManager
           הוסף קובץ
         </label>
 
-        @if($page['can_manage'] || ($page['classroom']['allow_member_posting'] ?? false))
+        @if(($page['can_manage'] ?? false) || ($page['classroom']['allow_member_posting'] ?? false))
           <div class="visibility-option">
             <label class="toggle-switch">
               <input type="checkbox" id="quick-add-is-public" checked>
