@@ -92,7 +92,7 @@ class ClassroomResource extends Resource
                                             ->default(true),
                                         Forms\Components\Select::make('classroom_admins')
                                             ->label('Additional Classroom Admins')
-                                            ->relationship('users', 'name', fn ($query) => $query->where('role', 'user'))
+                                            ->relationship('users', 'name', fn ($query) => $query->where('users.role', 'user'))
                                             ->multiple()
                                             ->searchable()
                                             ->preload()

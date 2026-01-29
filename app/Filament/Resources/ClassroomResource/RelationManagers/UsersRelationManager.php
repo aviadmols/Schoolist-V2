@@ -14,11 +14,6 @@ class UsersRelationManager extends RelationManager
 
     protected static ?string $recordTitleAttribute = 'name';
 
-    protected function modifyQueryUsing(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
-    {
-        return $query->where('users.role', 'user');
-    }
-
     public function form(Form $form): Form
     {
         return $form
