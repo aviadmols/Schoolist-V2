@@ -1127,27 +1127,27 @@ class TemplateManager
       };
 
       const setContentPopup = (dataset) => {
-      if (!dataset) return;
-      try {
-        const type = dataset.itemType || 'message';
-        if (contentPopupType) {
-          contentPopupType.textContent = typeLabels[type] || type;
-        }
-        if (contentPopupTitle) {
-          contentPopupTitle.textContent = dataset.itemTitle || '';
-        }
-        if (contentPopupBody) {
-          contentPopupBody.textContent = dataset.itemContent || '';
-        }
-        if (contentPopupDate) {
-          contentPopupDate.textContent = dataset.itemDate || '';
-        }
-        if (contentPopupTime) {
-          contentPopupTime.textContent = dataset.itemTime || '';
-        }
-        if (contentPopupLocation) {
-          contentPopupLocation.textContent = dataset.itemLocation || '';
-        }
+        if (!dataset) return;
+        try {
+          const type = dataset.itemType || 'message';
+          if (contentPopupType) {
+            contentPopupType.textContent = typeLabels[type] || type;
+          }
+          if (contentPopupTitle) {
+            contentPopupTitle.textContent = dataset.itemTitle || '';
+          }
+          if (contentPopupBody) {
+            contentPopupBody.textContent = dataset.itemContent || '';
+          }
+          if (contentPopupDate) {
+            contentPopupDate.textContent = dataset.itemDate || '';
+          }
+          if (contentPopupTime) {
+            contentPopupTime.textContent = dataset.itemTime || '';
+          }
+          if (contentPopupLocation) {
+            contentPopupLocation.textContent = dataset.itemLocation || '';
+          }
         } catch (err) {
           // Silently fail
         }
@@ -1169,25 +1169,25 @@ class TemplateManager
       };
 
       const openPopup = (popupId) => {
-      try {
-        if (!popupId) {
-          console.warn('openPopup: popupId is empty');
-          return;
-        }
-        const target = document.getElementById(popupId);
-        if (!target) {
-          console.warn('Popup not found:', popupId, 'Available popups:', Array.from(document.querySelectorAll('[data-popup]')).map(p => p.id));
-          return;
-        }
-        if (popups && popups.length > 0) {
-          popups.forEach((popup) => {
-            if (popup) popup.classList.remove('is-open');
-          });
-        }
-        target.classList.add('is-open');
-        if (backdrop) {
-          backdrop.classList.add('is-open');
-        }
+        try {
+          if (!popupId) {
+            console.warn('openPopup: popupId is empty');
+            return;
+          }
+          const target = document.getElementById(popupId);
+          if (!target) {
+            console.warn('Popup not found:', popupId, 'Available popups:', Array.from(document.querySelectorAll('[data-popup]')).map(p => p.id));
+            return;
+          }
+          if (popups && popups.length > 0) {
+            popups.forEach((popup) => {
+              if (popup) popup.classList.remove('is-open');
+            });
+          }
+          target.classList.add('is-open');
+          if (backdrop) {
+            backdrop.classList.add('is-open');
+          }
         } catch (err) {
           console.error('Error opening popup:', err, 'popupId:', popupId);
         }
@@ -1196,8 +1196,8 @@ class TemplateManager
       // Setup popup triggers with error handling
       try {
         const itemPopupTriggers = document.querySelectorAll('[data-item-popup]');
-      if (itemPopupTriggers && itemPopupTriggers.length > 0) {
-        itemPopupTriggers.forEach((trigger) => {
+        if (itemPopupTriggers && itemPopupTriggers.length > 0) {
+          itemPopupTriggers.forEach((trigger) => {
           if (!trigger || typeof trigger.addEventListener !== 'function') return;
           try {
             trigger.addEventListener('click', (event) => {
@@ -1222,9 +1222,9 @@ class TemplateManager
                 // Ignore
               }
             });
-          } catch (err) {
-            console.error('Error adding event listener to trigger:', err);
-          }
+            } catch (err) {
+              console.error('Error adding event listener to trigger:', err);
+            }
           });
         }
       } catch (err) {
