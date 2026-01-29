@@ -96,10 +96,22 @@ class EditClassroom extends EditRecord
      */
     protected function analyzeAiContent(array $data, OpenRouterService $service): void
     {
+        $startTime = microtime(true);
+        $requestId = uniqid('admin_ai_analyze_', true);
+        
+        Log::info("[Admin AI Analyze] Request started", [
+            'request_id' => $requestId,
+            'classroom_id' => $this->record?->id,
+            'user_id' => auth()->id(),
+            'has_text' => isset($data['content_text']),
+            'has_file' => isset($data['content_file']),
+        ]);
+
         $text = trim((string) ($data['content_text'] ?? ''));
         $file = $data['content_file'] ?? null;
 
         if ($text === '' && !$file instanceof UploadedFile) {
+            Log::warning("[Admin AI Analyze] Empty input", ['request_id' => $requestId]);
             Notification::make()
                 ->title('Provide text or an image')
                 ->danger()
@@ -111,8 +123,19 @@ class EditClassroom extends EditRecord
             $file = null;
         }
 
+        Log::info("[Admin AI Analyze] Input processed", [
+            'request_id' => $requestId,
+            'text_length' => strlen($text),
+            'has_file' => $file instanceof UploadedFile,
+            'file_size' => $file instanceof UploadedFile ? $file->getSize() : null,
+        ]);
+
         $setting = $this->getAiSetting();
         if (!$setting || !$setting->token || !$setting->content_analyzer_model || !$setting->content_analyzer_prompt) {
+            Log::error("[Admin AI Analyze] Missing AI settings", [
+                'request_id' => $requestId,
+                'has_setting' => $setting !== null,
+            ]);
             Notification::make()
                 ->title('OpenRouter settings are missing')
                 ->danger()
@@ -123,6 +146,14 @@ class EditClassroom extends EditRecord
         $prompt = $this->buildContentAnalyzerPrompt($setting->content_analyzer_prompt, $text);
         [$imageMime, $imageBase64] = $this->resolveImagePayload($file);
 
+        Log::info("[Admin AI Analyze] Prompt built", [
+            'request_id' => $requestId,
+            'prompt_length' => strlen($prompt),
+            'prompt_preview' => substr($prompt, 0, 200) . '...',
+            'has_image' => $imageMime !== null,
+        ]);
+
+        $apiStartTime = microtime(true);
         $response = $service->requestContentAnalysis(
             (string) $setting->token,
             (string) $setting->content_analyzer_model,
@@ -131,9 +162,22 @@ class EditClassroom extends EditRecord
             $imageBase64,
             $this->record?->id
         );
+        $apiDuration = microtime(true) - $apiStartTime;
+
+        Log::info("[Admin AI Analyze] API response received", [
+            'request_id' => $requestId,
+            'api_duration_seconds' => round($apiDuration, 2),
+            'has_response' => $response !== null,
+            'response_length' => $response ? strlen($response) : 0,
+            'response_preview' => $response ? substr($response, 0, 500) : null,
+        ]);
 
         if (!$response) {
             $error = $service->getLastError();
+            Log::error("[Admin AI Analyze] API failed", [
+                'request_id' => $requestId,
+                'error' => $error,
+            ]);
             Notification::make()
                 ->title('OpenRouter request failed')
                 ->body($error ?: 'OpenRouter returned an empty response.')
@@ -143,13 +187,32 @@ class EditClassroom extends EditRecord
         }
 
         $suggestion = $this->parseContentAnalyzerResponse($response);
+        
+        Log::info("[Admin AI Analyze] Response parsed", [
+            'request_id' => $requestId,
+            'has_suggestion' => $suggestion !== null,
+            'suggestion_type' => $suggestion['type'] ?? null,
+            'suggestion_keys' => $suggestion ? array_keys($suggestion) : null,
+            'suggestion_data' => $suggestion,
+        ]);
+
         if (!$suggestion) {
+            Log::error("[Admin AI Analyze] Parse failed", [
+                'request_id' => $requestId,
+                'raw_response' => $response,
+            ]);
             Notification::make()
                 ->title('Unable to parse AI response')
                 ->danger()
                 ->send();
             return;
         }
+
+        $totalDuration = microtime(true) - $startTime;
+        Log::info("[Admin AI Analyze] Request completed", [
+            'request_id' => $requestId,
+            'total_duration_seconds' => round($totalDuration, 2),
+        ]);
 
         $this->aiSuggestion = $suggestion;
         session()->put($this->getAiSuggestionSessionKey(), $suggestion);
@@ -174,17 +237,44 @@ class EditClassroom extends EditRecord
             return;
         }
 
+        $startTime = microtime(true);
+        $requestId = uniqid('admin_ai_store_', true);
+        
+        Log::info("[Admin AI Store] Request started", [
+            'request_id' => $requestId,
+            'classroom_id' => $this->record?->id,
+            'user_id' => auth()->id(),
+            'has_suggestion' => $this->aiSuggestion !== null,
+            'suggestion_type' => $this->aiSuggestion['type'] ?? null,
+        ]);
+
         try {
+            Log::info("[Admin AI Store] Creating content", [
+                'request_id' => $requestId,
+                'suggestion' => $this->aiSuggestion,
+            ]);
+            
             $summary = $this->createContentFromSuggestion($this->aiSuggestion);
+            
+            $totalDuration = microtime(true) - $startTime;
+            Log::info("[Admin AI Store] Request completed", [
+                'request_id' => $requestId,
+                'total_duration_seconds' => round($totalDuration, 2),
+                'summary' => $summary,
+            ]);
         } catch (\Throwable $exception) {
-            Log::error('AI quick add failed', [
+            $totalDuration = microtime(true) - $startTime;
+            Log::error("[Admin AI Store] Failed", [
+                'request_id' => $requestId,
                 'classroom_id' => $this->record?->id,
+                'duration_seconds' => round($totalDuration, 2),
                 'error' => $exception->getMessage(),
+                'trace' => $exception->getTraceAsString(),
                 'suggestion' => $this->aiSuggestion,
             ]);
             Notification::make()
                 ->title('Unable to create content')
-                ->body('Check logs for details.')
+                ->body('Check logs for details. Request ID: ' . $requestId)
                 ->danger()
                 ->send();
             return;
@@ -316,15 +406,40 @@ class EditClassroom extends EditRecord
      */
     protected function createContentFromSuggestion(array $suggestion): string
     {
+        $requestId = uniqid('admin_create_', true);
         $type = (string) ($suggestion['type'] ?? 'unknown');
         $data = $suggestion['extracted_data'] ?? [];
         $classroomId = (int) $this->record->id;
 
+        Log::info("[Admin Create Content] Starting", [
+            'request_id' => $requestId,
+            'type' => $type,
+            'classroom_id' => $classroomId,
+            'data_keys' => array_keys($data),
+            'data' => $data,
+        ]);
+
         if ($type === 'contact') {
             $contacts = $this->normalizeContactItems($data);
-            foreach ($contacts as $contact) {
+            Log::info("[Admin Create Content] Creating contacts", [
+                'request_id' => $requestId,
+                'contacts_count' => count($contacts),
+                'contacts' => $contacts,
+            ]);
+            
+            foreach ($contacts as $index => $contact) {
                 $name = (string) ($contact['name'] ?? '');
                 [$firstName, $lastName] = $this->splitName($name);
+
+                Log::info("[Admin Create Content] Creating contact", [
+                    'request_id' => $requestId,
+                    'index' => $index,
+                    'name' => $name,
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'role' => $contact['role'] ?? '',
+                    'phone' => $contact['phone'] ?? '',
+                ]);
 
                 ImportantContact::create([
                     'classroom_id' => $classroomId,
@@ -336,26 +451,49 @@ class EditClassroom extends EditRecord
                 ]);
             }
 
+            Log::info("[Admin Create Content] Contacts created", ['request_id' => $requestId]);
             return 'Contacts created';
         }
 
         if ($type === 'contact_page') {
+            Log::info("[Admin Create Content] Creating child contact page", [
+                'request_id' => $requestId,
+                'child_name' => $data['child_name'] ?? null,
+                'child_birth_date' => $data['child_birth_date'] ?? null,
+                'parent1_name' => $data['parent1_name'] ?? null,
+                'parent2_name' => $data['parent2_name'] ?? null,
+            ]);
+            
             $child = Child::create([
                 'classroom_id' => $classroomId,
                 'name' => (string) ($data['child_name'] ?? ''),
                 'birth_date' => $this->normalizeDate($data['child_birth_date'] ?? null),
             ]);
 
+            Log::info("[Admin Create Content] Child created", [
+                'request_id' => $requestId,
+                'child_id' => $child->id,
+            ]);
+
             $this->createChildContact($child, $data['parent1_name'] ?? null, $data['parent1_role'] ?? null, $data['parent1_phone'] ?? null);
             $this->createChildContact($child, $data['parent2_name'] ?? null, $data['parent2_role'] ?? null, $data['parent2_phone'] ?? null);
 
+            Log::info("[Admin Create Content] Child contact page created", ['request_id' => $requestId]);
             return 'Child contact page created';
         }
 
         if (in_array($type, ['announcement', 'event', 'homework'], true)) {
             $announcementType = $type === 'announcement' ? 'message' : $type;
             $items = $this->normalizeAnnouncementItems($data);
-            foreach ($items as $item) {
+            
+            Log::info("[Admin Create Content] Creating announcements", [
+                'request_id' => $requestId,
+                'announcement_type' => $announcementType,
+                'items_count' => count($items),
+                'items' => $items,
+            ]);
+            
+            foreach ($items as $index => $item) {
                 $dateValue = $item['date'] ?? $item['due_date'] ?? null;
                 $dateData = $this->normalizeDateValue($dateValue);
                 $title = $this->computeAnnouncementTitle(
@@ -363,7 +501,17 @@ class EditClassroom extends EditRecord
                     (string) ($item['content'] ?? $item['description'] ?? '')
                 );
 
-                Announcement::create([
+                Log::info("[Admin Create Content] Creating announcement", [
+                    'request_id' => $requestId,
+                    'index' => $index,
+                    'title' => $title,
+                    'date_value' => $dateValue,
+                    'date_data' => $dateData,
+                    'time' => $item['time'] ?? null,
+                    'location' => $item['location'] ?? null,
+                ]);
+
+                $announcement = Announcement::create([
                     'classroom_id' => $classroomId,
                     'user_id' => auth()->id(),
                     'type' => $announcementType,
@@ -374,8 +522,18 @@ class EditClassroom extends EditRecord
                     'occurs_at_time' => $this->normalizeTime($item['time'] ?? null),
                     'location' => (string) ($item['location'] ?? ''),
                 ]);
+                
+                Log::info("[Admin Create Content] Announcement created", [
+                    'request_id' => $requestId,
+                    'index' => $index,
+                    'announcement_id' => $announcement->id,
+                ]);
             }
 
+            Log::info("[Admin Create Content] Announcements created", [
+                'request_id' => $requestId,
+                'count' => count($items),
+            ]);
             return 'Announcements created';
         }
 
