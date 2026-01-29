@@ -575,7 +575,7 @@ class TemplateManager
         </div>
       @endif
     </div>
-    <div class="fab-btn" data-popup-target="popup-homework">+</div>
+    <div class="fab-btn" data-popup-target="popup-quick-add">+</div>
   </div>
 
   <div class="card">
