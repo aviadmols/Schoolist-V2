@@ -257,20 +257,7 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
                     $date = Carbon::parse($announcement['occurs_on_date'], $classroom->timezone);
                     return $date->isSameDay($today) || $date->greaterThan($today);
                 })
-                ->map(function (array $announcement) use ($formatDate, $formatTime, $user): array {
-                    $announcementModel = \App\Models\Announcement::find($announcement['id'] ?? null);
-                    $isDone = false;
-                    if ($announcementModel && $user) {
-                        $status = $announcementModel->currentUserStatus;
-                        $isDone = $status && $status->done_at !== null;
-                    }
-                    
-                    $createdBy = null;
-                    if ($announcementModel && $announcementModel->creator) {
-                        $creator = $announcementModel->creator;
-                        $createdBy = $creator->name ?? ($creator->phone ?? 'משתמש');
-                    }
-                    
+                ->map(function (array $announcement) use ($formatDate, $formatTime): array {
                     return [
                         'id' => $announcement['id'] ?? null,
                         'type' => $announcement['type'] ?? 'message',
@@ -279,8 +266,8 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
                         'date' => $formatDate($announcement['occurs_on_date'] ?? null),
                         'time' => $formatTime($announcement['occurs_at_time'] ?? null),
                         'location' => $announcement['location'] ?? '',
-                        'is_done' => $isDone,
-                        'created_by' => $createdBy,
+                        'is_done' => $announcement['is_done'] ?? false,
+                        'created_by' => $announcement['created_by'] ?? null,
                     ];
                 })
                 ->values()
@@ -288,13 +275,6 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
             'events' => $announcementService->getActiveFeed($classroom)
                 ->filter(fn (array $announcement) => ($announcement['type'] ?? '') === 'event')
                 ->map(function (array $announcement) use ($formatDate, $formatTime): array {
-                    $announcementModel = \App\Models\Announcement::find($announcement['id'] ?? null);
-                    $createdBy = null;
-                    if ($announcementModel && $announcementModel->creator) {
-                        $creator = $announcementModel->creator;
-                        $createdBy = $creator->name ?? ($creator->phone ?? 'משתמש');
-                    }
-                    
                     return [
                         'id' => $announcement['id'] ?? null,
                         'type' => $announcement['type'] ?? 'event',
@@ -303,7 +283,7 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
                         'date' => $formatDate($announcement['occurs_on_date'] ?? null),
                         'time' => $formatTime($announcement['occurs_at_time'] ?? null),
                         'location' => $announcement['location'] ?? '',
-                        'created_by' => $createdBy,
+                        'created_by' => $announcement['created_by'] ?? null,
                     ];
                 })
                 ->values()

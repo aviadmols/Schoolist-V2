@@ -28,7 +28,7 @@ class AnnouncementFeedService
         $now = Carbon::now($classroom->timezone);
 
         return Announcement::where('classroom_id', $classroom->id)
-            ->with(['currentUserStatus'])
+            ->with(['currentUserStatus', 'creator'])
             ->get()
             ->filter(function (Announcement $announcement) use ($classroom, $now) {
                 $window = $this->windowService->getVisibilityWindow(
@@ -42,6 +42,11 @@ class AnnouncementFeedService
                 return $now->between($window['from'], $window['until']);
             })
             ->map(function (Announcement $announcement) {
+                $createdBy = null;
+                if ($announcement->creator) {
+                    $createdBy = $announcement->creator->name ?? ($announcement->creator->phone ?? 'משתמש');
+                }
+
                 return [
                     'id' => $announcement->id,
                     'type' => $announcement->type,
@@ -54,6 +59,7 @@ class AnnouncementFeedService
                     'location' => $announcement->location,
                     'attachment_path' => $announcement->attachment_path,
                     'is_done' => $announcement->currentUserStatus?->done_at !== null,
+                    'created_by' => $createdBy,
                 ];
             })
             ->values();

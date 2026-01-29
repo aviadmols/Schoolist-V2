@@ -15,6 +15,9 @@ class TemplateRenderer
     /** @var int */
     private const CACHE_TTL_SECONDS = 60;
 
+    /** @var array<string, BuilderTemplate|null> */
+    private static array $templateCache = [];
+
     /**
      * Render a published template by key when override is enabled.
      */
@@ -92,7 +95,11 @@ class TemplateRenderer
      */
     public function getGlobalTemplateByKey(string $key): ?BuilderTemplate
     {
-        return BuilderTemplate::query()
+        if (array_key_exists($key, self::$templateCache)) {
+            return self::$templateCache[$key];
+        }
+
+        return self::$templateCache[$key] = BuilderTemplate::query()
             ->where('scope', config('builder.scope'))
             ->where('key', $key)
             ->first();

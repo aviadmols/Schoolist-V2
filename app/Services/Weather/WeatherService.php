@@ -5,11 +5,15 @@ namespace App\Services\Weather;
 use App\Models\Classroom;
 use App\Models\WeatherSetting;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class WeatherService
 {
+    /** @var int */
+    private const WEATHER_CACHE_TTL = 1800; // 30 minutes
+
     /**
      * Get weather data for a classroom.
      *
@@ -26,34 +30,39 @@ class WeatherService
 
         $now = Carbon::now($classroom->timezone);
         $targetDate = $now->hour >= 16 ? $now->copy()->addDay() : $now->copy();
+        $isToday = $targetDate->isToday();
 
-        try {
-            $weatherData = $this->fetchWeatherData($setting, $targetDate);
+        $cacheKey = "weather.data.{$setting->id}." . ($isToday ? 'today' : 'tomorrow');
 
-            if (!$weatherData) {
+        return Cache::remember($cacheKey, self::WEATHER_CACHE_TTL, function () use ($classroom, $setting, $targetDate) {
+            try {
+                $weatherData = $this->fetchWeatherData($setting, $targetDate);
+
+                if (!$weatherData) {
+                    return $this->getDefaultWeather();
+                }
+
+                $temperature = $weatherData['temp'] ?? null;
+                $isRaining = ($weatherData['condition'] ?? '') === 'rain' || str_contains(strtolower($weatherData['description'] ?? ''), 'rain');
+                $icon = $this->getWeatherIcon($temperature, $isRaining, $setting->icon_mapping ?? []);
+                $recommendation = $this->getWeatherRecommendation($temperature ?? 20, $isRaining);
+                $text = $this->formatWeatherText($temperature, $weatherData['description'] ?? '', $recommendation);
+
+                return [
+                    'text' => $text,
+                    'icon' => $icon,
+                    'recommendation' => $recommendation,
+                    'temperature' => $temperature,
+                ];
+            } catch (\Throwable $exception) {
+                Log::error('Weather fetch failed', [
+                    'classroom_id' => $classroom->id,
+                    'error' => $exception->getMessage(),
+                ]);
+
                 return $this->getDefaultWeather();
             }
-
-            $temperature = $weatherData['temp'] ?? null;
-            $isRaining = ($weatherData['condition'] ?? '') === 'rain' || str_contains(strtolower($weatherData['description'] ?? ''), 'rain');
-            $icon = $this->getWeatherIcon($temperature, $isRaining, $setting->icon_mapping ?? []);
-            $recommendation = $this->getWeatherRecommendation($temperature ?? 20, $isRaining);
-            $text = $this->formatWeatherText($temperature, $weatherData['description'] ?? '', $recommendation);
-
-            return [
-                'text' => $text,
-                'icon' => $icon,
-                'recommendation' => $recommendation,
-                'temperature' => $temperature,
-            ];
-        } catch (\Throwable $exception) {
-            Log::error('Weather fetch failed', [
-                'classroom_id' => $classroom->id,
-                'error' => $exception->getMessage(),
-            ]);
-
-            return $this->getDefaultWeather();
-        }
+        });
     }
 
     /**
