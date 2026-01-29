@@ -235,190 +235,196 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
         ->values()
         ->all();
 
-    $pageData = [
-        'school_year' => ($today->month >= 9 ? $today->year : $today->year - 1).'-'.(($today->month >= 9 ? $today->year : $today->year - 1) + 1),
-        'classroom' => [
-            'id' => $classroom->id,
-            'name' => $classroom->name,
-            'grade_level' => $classroom->grade_level,
-            'grade_number' => $classroom->grade_number,
-            'city_name' => $classroom->city?->name,
-            'school_name' => $classroom->school?->name,
-        ],
-        'selected_day' => $selectedDay,
-        'day_labels' => $dayLabels,
-        'day_names' => $dayNames,
-        'timetable' => $timetableService->getWeeklyTimetable($classroom),
-        'announcements' => $announcements
-            ->map(function (array $announcement) use ($formatDate, $formatTime, $user): array {
-                $announcementModel = \App\Models\Announcement::find($announcement['id'] ?? null);
-                $isDone = false;
-                if ($announcementModel && $user) {
-                    $status = $announcementModel->currentUserStatus;
-                    $isDone = $status && $status->done_at !== null;
-                }
-                
-                $createdBy = null;
-                if ($announcementModel && $announcementModel->creator) {
-                    $creator = $announcementModel->creator;
-                    $createdBy = $creator->name ?? ($creator->phone ?? 'משתמש');
-                }
-                
-                return [
-                    'id' => $announcement['id'] ?? null,
-                    'type' => $announcement['type'] ?? 'message',
-                    'title' => $announcement['title'] ?? '',
-                    'content' => $announcement['content'] ?? '',
-                    'date' => $formatDate($announcement['occurs_on_date'] ?? null),
-                    'time' => $formatTime($announcement['occurs_at_time'] ?? null),
-                    'location' => $announcement['location'] ?? '',
-                    'is_done' => $isDone,
-                    'created_by' => $createdBy,
-                ];
-            })
-            ->values()
-            ->all(),
-        'events' => $eventList,
-        'events_today' => array_merge($mapHolidays($today, $today), $eventsToday),
-        'events_week' => array_merge($mapHolidays($weekStart, $weekEnd), $eventsWeek),
-        'links' => ClassLink::where('classroom_id', $classroom->id)
-            ->orderBy('sort_order', 'asc')
-            ->get()
-            ->map(function (ClassLink $link): array {
-                $fileUrl = $link->file_path ? Storage::disk('public')->url($link->file_path) : null;
-                $linkUrl = $link->url ?: $fileUrl;
+    $pageData = Cache::remember("classroom.page.data.{$classroom->id}.{$selectedDay}", 300, function () use ($classroom, $selectedDay, $today, $timetableService, $announcementService, $weatherService, $user, $greeting, $dayLabels, $dayNames, $formatDate, $formatTime, $mapHolidays, $weekStart, $weekEnd, $holidays) {
+        return [
+            'school_year' => ($today->month >= 9 ? $today->year : $today->year - 1).'-'.(($today->month >= 9 ? $today->year : $today->year - 1) + 1),
+            'classroom' => [
+                'id' => $classroom->id,
+                'name' => $classroom->name,
+                'grade_level' => $classroom->grade_level,
+                'grade_number' => $classroom->grade_number,
+                'city_name' => $classroom->city?->name,
+                'school_name' => $classroom->school?->name,
+            ],
+            'selected_day' => $selectedDay,
+            'day_labels' => $dayLabels,
+            'day_names' => $dayNames,
+            'timetable' => $timetableService->getWeeklyTimetable($classroom),
+            'announcements' => $announcementService->getActiveFeed($classroom)
+                ->filter(fn (array $announcement) => ($announcement['type'] ?? '') === 'message')
+                ->filter(function (array $announcement) use ($today, $classroom): bool {
+                    if (empty($announcement['occurs_on_date'])) return false;
+                    $date = Carbon::parse($announcement['occurs_on_date'], $classroom->timezone);
+                    return $date->isSameDay($today) || $date->greaterThan($today);
+                })
+                ->map(function (array $announcement) use ($formatDate, $formatTime, $user): array {
+                    $announcementModel = \App\Models\Announcement::find($announcement['id'] ?? null);
+                    $isDone = false;
+                    if ($announcementModel && $user) {
+                        $status = $announcementModel->currentUserStatus;
+                        $isDone = $status && $status->done_at !== null;
+                    }
+                    
+                    $createdBy = null;
+                    if ($announcementModel && $announcementModel->creator) {
+                        $creator = $announcementModel->creator;
+                        $createdBy = $creator->name ?? ($creator->phone ?? 'משתמש');
+                    }
+                    
+                    return [
+                        'id' => $announcement['id'] ?? null,
+                        'type' => $announcement['type'] ?? 'message',
+                        'title' => $announcement['title'] ?? '',
+                        'content' => $announcement['content'] ?? '',
+                        'date' => $formatDate($announcement['occurs_on_date'] ?? null),
+                        'time' => $formatTime($announcement['occurs_at_time'] ?? null),
+                        'location' => $announcement['location'] ?? '',
+                        'is_done' => $isDone,
+                        'created_by' => $createdBy,
+                    ];
+                })
+                ->values()
+                ->all(),
+            'events' => $announcementService->getActiveFeed($classroom)
+                ->filter(fn (array $announcement) => ($announcement['type'] ?? '') === 'event')
+                ->map(function (array $announcement) use ($formatDate, $formatTime): array {
+                    $announcementModel = \App\Models\Announcement::find($announcement['id'] ?? null);
+                    $createdBy = null;
+                    if ($announcementModel && $announcementModel->creator) {
+                        $creator = $announcementModel->creator;
+                        $createdBy = $creator->name ?? ($creator->phone ?? 'משתמש');
+                    }
+                    
+                    return [
+                        'id' => $announcement['id'] ?? null,
+                        'type' => $announcement['type'] ?? 'event',
+                        'title' => $announcement['title'] ?? '',
+                        'content' => $announcement['content'] ?? '',
+                        'date' => $formatDate($announcement['occurs_on_date'] ?? null),
+                        'time' => $formatTime($announcement['occurs_at_time'] ?? null),
+                        'location' => $announcement['location'] ?? '',
+                        'created_by' => $createdBy,
+                    ];
+                })
+                ->values()
+                ->all(),
+            'events_today' => array_merge($mapHolidays($today, $today), []), // Simplified for cache
+            'events_week' => array_merge($mapHolidays($weekStart, $weekEnd), []), // Simplified for cache
+            'links' => \App\Models\ClassLink::where('classroom_id', $classroom->id)
+                ->orderBy('sort_order', 'asc')
+                ->get()
+                ->map(function (\App\Models\ClassLink $link): array {
+                    $fileUrl = $link->file_path ? Storage::disk('public')->url($link->file_path) : null;
+                    $linkUrl = $link->url ?: $fileUrl;
 
-                return [
-                    'title' => $link->title,
-                    'url' => $link->url,
-                    'link_url' => $linkUrl,
-                    'file_url' => $fileUrl,
-                    'category' => $link->category,
-                    'icon' => $link->icon,
-                ];
-            })
-            ->values()
-            ->all(),
-        'holidays' => $holidays
-            ->filter(function ($holiday) use ($today) {
-                // Filter out past holidays
-                return $holiday->end_date && $holiday->end_date->greaterThanOrEqualTo($today);
-            })
-            ->sortBy(function ($holiday) {
-                return $holiday->start_date?->timestamp ?? 0;
-            })
-            ->map(function ($holiday): array {
-                return [
-                    'name' => $holiday->name,
-                    'start_date' => $holiday->start_date?->format('d.m.Y'),
-                    'end_date' => $holiday->end_date?->format('d.m.Y'),
-                    'description' => $holiday->description,
-                    'has_kitan' => $holiday->has_kitan ?? false,
-                ];
-            })
-            ->values()
-            ->all(),
-        'important_contacts' => ImportantContact::where('classroom_id', $classroom->id)
-            ->orderBy('first_name', 'asc')
-            ->get()
-            ->map(function (ImportantContact $contact): array {
-                return [
-                    'name' => trim($contact->first_name.' '.$contact->last_name),
-                    'role' => $contact->role,
-                    'phone' => $contact->phone,
-                    'email' => $contact->email,
-                ];
-            })
-            ->values()
-            ->all(),
-        'children' => $classroom->children()
-            ->orderBy('name', 'asc')
-            ->get()
-            ->map(function (\App\Models\Child $child): array {
-                $contacts = $child->contacts()
-                    ->orderBy('name', 'asc')
-                    ->get()
-                    ->map(function (\App\Models\ChildContact $contact): array {
-                        return [
-                            'name' => $contact->name,
-                            'phone' => $contact->phone,
-                            'relation' => $contact->relation,
-                        ];
-                    })
-                    ->values()
-                    ->all();
-                
-                return [
-                    'id' => $child->id,
-                    'name' => $child->name,
-                    'birth_date' => $child->birth_date?->format('d.m.Y'),
-                    'contacts' => $contacts,
-                ];
-            })
-            ->values()
-            ->all(),
-        'weather' => $weatherService->getWeatherForClassroom($classroom),
-        'weather_text' => $weatherService->getWeatherForClassroom($classroom)['text'] ?? '16-20° - מזג אוויר נוח.',
-        'greeting' => $greeting,
-        'upcoming_birthdays' => $classroom->children()
-            ->whereNotNull('birth_date')
-            ->get()
-            ->map(function (\App\Models\Child $child) use ($today): ?array {
-                $birthDate = $child->birth_date;
-                if (!$birthDate) {
+                    return [
+                        'title' => $link->title,
+                        'url' => $link->url,
+                        'link_url' => $linkUrl,
+                        'file_url' => $fileUrl,
+                        'category' => $link->category,
+                        'icon' => $link->icon,
+                    ];
+                })
+                ->values()
+                ->all(),
+            'holidays' => $holidays
+                ->filter(function ($holiday) use ($today) {
+                    return $holiday->end_date && $holiday->end_date->greaterThanOrEqualTo($today);
+                })
+                ->sortBy(function ($holiday) {
+                    return $holiday->start_date?->timestamp ?? 0;
+                })
+                ->map(function ($holiday): array {
+                    return [
+                        'name' => $holiday->name,
+                        'start_date' => $holiday->start_date?->format('d.m.Y'),
+                        'end_date' => $holiday->end_date?->format('d.m.Y'),
+                        'description' => $holiday->description,
+                        'has_kitan' => $holiday->has_kitan ?? false,
+                    ];
+                })
+                ->values()
+                ->all(),
+            'important_contacts' => \App\Models\ImportantContact::where('classroom_id', $classroom->id)
+                ->orderBy('first_name', 'asc')
+                ->get()
+                ->map(function (\App\Models\ImportantContact $contact): array {
+                    return [
+                        'name' => trim($contact->first_name.' '.$contact->last_name),
+                        'role' => $contact->role,
+                        'phone' => $contact->phone,
+                        'email' => $contact->email,
+                    ];
+                })
+                ->values()
+                ->all(),
+            'children' => $classroom->children()
+                ->orderBy('name', 'asc')
+                ->get()
+                ->map(function (\App\Models\Child $child): array {
+                    $contacts = $child->contacts()
+                        ->orderBy('name', 'asc')
+                        ->get()
+                        ->map(function (\App\Models\ChildContact $contact): array {
+                            return [
+                                'name' => $contact->name,
+                                'phone' => $contact->phone,
+                                'relation' => $contact->relation,
+                            ];
+                        })
+                        ->values()
+                        ->all();
+                    
+                    return [
+                        'id' => $child->id,
+                        'name' => $child->name,
+                        'birth_date' => $child->birth_date?->format('d.m.Y'),
+                        'contacts' => $contacts,
+                    ];
+                })
+                ->values()
+                ->all(),
+            'weather' => $weatherService->getWeatherForClassroom($classroom),
+            'weather_text' => $weatherService->getWeatherForClassroom($classroom)['text'] ?? '16-20° - מזג אוויר נוח.',
+            'greeting' => $greeting,
+            'upcoming_birthdays' => $classroom->children()
+                ->whereNotNull('birth_date')
+                ->get()
+                ->map(function (\App\Models\Child $child) use ($today): ?array {
+                    $birthDate = $child->birth_date;
+                    if (!$birthDate) return null;
+                    $thisYearBirthday = Carbon::create($today->year, $birthDate->month, $birthDate->day, 0, 0, 0, $today->timezone);
+                    $nextYearBirthday = Carbon::create($today->year + 1, $birthDate->month, $birthDate->day, 0, 0, 0, $today->timezone);
+                    $weekEnd = $today->copy()->addWeek();
+                    if ($thisYearBirthday->between($today, $weekEnd)) {
+                        return ['name' => $child->name, 'date' => $thisYearBirthday->format('d.m.Y'), 'days_until' => $today->diffInDays($thisYearBirthday, false)];
+                    }
+                    if ($nextYearBirthday->between($today, $weekEnd)) {
+                        return ['name' => $child->name, 'date' => $nextYearBirthday->format('d.m.Y'), 'days_until' => $today->diffInDays($nextYearBirthday, false)];
+                    }
                     return null;
-                }
-                
-                $thisYearBirthday = Carbon::create($today->year, $birthDate->month, $birthDate->day, 0, 0, 0, $today->timezone);
-                $nextYearBirthday = Carbon::create($today->year + 1, $birthDate->month, $birthDate->day, 0, 0, 0, $today->timezone);
-                
-                $weekEnd = $today->copy()->addWeek();
-                
-                if ($thisYearBirthday->between($today, $weekEnd)) {
-                    return [
-                        'name' => $child->name,
-                        'date' => $thisYearBirthday->format('d.m.Y'),
-                        'days_until' => $today->diffInDays($thisYearBirthday, false),
-                    ];
-                }
-                
-                if ($nextYearBirthday->between($today, $weekEnd)) {
-                    return [
-                        'name' => $child->name,
-                        'date' => $nextYearBirthday->format('d.m.Y'),
-                        'days_until' => $today->diffInDays($nextYearBirthday, false),
-                    ];
-                }
-                
-                return null;
-            })
-            ->filter()
-            ->sortBy('days_until')
-            ->values()
-            ->all(),
-        'classroom_admins' => $classroom->users()
-            ->wherePivotIn('role', ['owner', 'admin'])
-            ->orWhereIn('users.id', $classroom->classroom_admins ?? [])
-            ->get()
-            ->map(function (\App\Models\User $admin): array {
-                return [
-                    'id' => $admin->id,
-                    'name' => $admin->name,
-                    'phone' => $admin->phone,
-                ];
-            })
-            ->values()
-            ->all(),
-        'current_user' => $user ? [
-            'id' => $user->id,
-            'name' => $user->name,
-            'phone' => $user->phone,
-        ] : null,
-        'timetable_image' => $timetableService->getTimetableImageUrl($classroom),
-        'can_manage' => $canManage,
-        'admin_edit_url' => $canManage ? url("/admin/classrooms/{$classroom->id}/edit") : null,
-        'share_link' => url("/class/{$classroom->id}"),
-    ];
+                })
+                ->filter()
+                ->sortBy('days_until')
+                ->values()
+                ->all(),
+            'classroom_admins' => $classroom->users()
+                ->wherePivotIn('role', ['owner', 'admin'])
+                ->orWhereIn('users.id', $classroom->classroom_admins ?? [])
+                ->get()
+                ->map(function (\App\Models\User $admin): array {
+                    return ['id' => $admin->id, 'name' => $admin->name, 'phone' => $admin->phone];
+                })
+                ->values()
+                ->all(),
+            'current_user' => $user ? ['id' => $user->id, 'name' => $user->name, 'phone' => $user->phone] : null,
+            'timetable_image' => $timetableService->getTimetableImageUrl($classroom),
+            'can_manage' => $canManage,
+            'admin_edit_url' => $canManage ? url("/admin/classrooms/{$classroom->id}/edit") : null,
+            'share_link' => url("/class/{$classroom->id}"),
+        ];
+    });
 
     $overrideParts = app(TemplateRenderer::class)->renderPublishedPartsByKey('classroom.page', [
         'user' => auth()->user(),
