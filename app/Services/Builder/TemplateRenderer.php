@@ -137,6 +137,12 @@ class TemplateRenderer
 
             $template = $this->getGlobalTemplateByKey($resolvedKey);
 
+            // For popups: if no template or override disabled, use default popup HTML
+            if ($type === 'popup' && (!$template || !$template->is_override_enabled || !$this->hasPublishedContent($template))) {
+                return $this->getDefaultPopupHtml($resolvedKey);
+            }
+
+            // For sections: return empty if no template
             if (!$template || !$template->is_override_enabled || !$this->hasPublishedContent($template)) {
                 return '';
             }
@@ -169,6 +175,59 @@ class TemplateRenderer
         }
 
         return $key;
+    }
+
+    /**
+     * Get default popup HTML when no template override exists.
+     */
+    private function getDefaultPopupHtml(string $key): string
+    {
+        $prefix = (string) config('builder.popup_prefix');
+        $shortKey = Str::after($key, $prefix);
+        $id = 'popup-'.Str::slug($shortKey);
+        
+        // Get title from config
+        $popups = (array) config('builder.default_popups', []);
+        $title = 'Popup';
+        foreach ($popups as $popup) {
+            if (($popup['key'] ?? '') === $shortKey) {
+                $title = (string) ($popup['title'] ?? $title);
+                break;
+            }
+        }
+        
+        // Get body HTML from TemplateManager
+        /** @var \App\Services\Builder\TemplateManager $templateManager */
+        $templateManager = app(\App\Services\Builder\TemplateManager::class);
+        $body = $this->getDefaultPopupBodyHtml($shortKey);
+        
+        return <<<HTML
+<div id="{$id}" class="sb-popup" data-popup>
+  <div class="sb-popup-card">
+    <div class="sb-modal-title">{$title}</div>
+    <div class="sb-modal-body">
+      {$body}
+    </div>
+    <div class="sb-modal-actions">
+      <button type="button" class="sb-button is-ghost" data-popup-close>סגור</button>
+      <button type="button" class="sb-button" data-popup-close>סיום</button>
+    </div>
+  </div>
+</div>
+HTML;
+    }
+
+    /**
+     * Get default popup body HTML by short key.
+     */
+    private function getDefaultPopupBodyHtml(string $shortKey): string
+    {
+        /** @var \App\Services\Builder\TemplateManager $templateManager */
+        $templateManager = app(\App\Services\Builder\TemplateManager::class);
+        $prefix = (string) config('builder.popup_prefix');
+        $fullKey = $prefix.$shortKey;
+        
+        return $templateManager->getPopupBodyHtml($fullKey);
     }
 
     /**

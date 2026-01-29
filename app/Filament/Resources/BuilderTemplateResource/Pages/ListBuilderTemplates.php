@@ -28,6 +28,22 @@ class ListBuilderTemplates extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            Actions\Action::make('refreshPopups')
+                ->label('Refresh All Popups')
+                ->icon('heroicon-o-arrow-path')
+                ->color('warning')
+                ->requiresConfirmation()
+                ->modalHeading('Refresh All Popup Templates')
+                ->modalDescription('This will update all popup templates with the latest default content. Existing customizations will be preserved if templates have been published.')
+                ->action(function (): void {
+                    $templateManager = app(TemplateManager::class);
+                    $templateManager->ensureDefaultTemplates();
+                    
+                    $this->notification()
+                        ->title('Popups Refreshed')
+                        ->success()
+                        ->send();
+                }),
             Actions\Action::make('createPopup')
                 ->label('Create Popup Template')
                 ->form([

@@ -25,11 +25,7 @@ class EditBuilderTemplate extends EditRecord
      */
     protected function getFormActions(): array
     {
-        return [
-            Actions\Action::make('saveDraft')
-                ->label('Save Draft')
-                ->action('save'),
-        ];
+        return [];
     }
 
     /**
@@ -54,8 +50,64 @@ class EditBuilderTemplate extends EditRecord
                 ->action(function (array $data, OpenRouterService $service): void {
                     $this->createTemplateHtmlWithSchemaFields($data, $service);
                 }),
+            Actions\Action::make('resetToDefault')
+                ->label('Reset to Default')
+                ->icon('heroicon-o-arrow-path')
+                ->color('warning')
+                ->requiresConfirmation()
+                ->modalHeading('Reset Template to Default')
+                ->modalDescription('This will replace the current draft with the default template content. Published content will not be affected unless you publish after reset.')
+                ->action(function (): void {
+                    $manager = app(TemplateManager::class);
+                    $key = $this->record->key;
+                    
+                    // Get default HTML based on template key
+                    $defaultHtml = null;
+                    if ($key === 'classroom.page') {
+                        $defaultHtml = $manager->getDefaultClassroomPageHtml();
+                    } elseif (str_starts_with($key, 'classroom.popup.')) {
+                        $shortKey = str_replace('classroom.popup.', '', $key);
+                        $popups = config('builder.default_popups', []);
+                        $title = 'Popup';
+                        foreach ($popups as $popup) {
+                            if (($popup['key'] ?? '') === $shortKey) {
+                                $title = $popup['title'] ?? $title;
+                                break;
+                            }
+                        }
+                        $defaultHtml = $manager->getDefaultPopupHtml($title, $key);
+                    }
+                    
+                    if ($defaultHtml) {
+                        $parts = $manager->splitTemplateParts($defaultHtml);
+                        $this->record->update([
+                            'draft_html' => $parts['html'],
+                            'draft_css' => $parts['css'],
+                            'draft_js' => $parts['js'],
+                            'updated_by' => auth()->id(),
+                        ]);
+                        
+                        $this->record->refresh();
+                        $this->form->fill($this->record->toArray());
+                        
+                        Notification::make()
+                            ->title('Template reset to default')
+                            ->success()
+                            ->send();
+                    } else {
+                        Notification::make()
+                            ->title('No default template found for this key')
+                            ->warning()
+                            ->send();
+                    }
+                }),
+            Actions\Action::make('saveDraft')
+                ->label('Save Draft')
+                ->color('gray')
+                ->action('save'),
             Actions\Action::make('publish')
                 ->label('Publish')
+                ->color('success')
                 ->requiresConfirmation()
                 ->action(function (): void {
                     $manager = app(TemplateManager::class);
@@ -65,6 +117,11 @@ class EditBuilderTemplate extends EditRecord
                         $this->record->draft_js
                     );
                     $manager->publishTemplate($this->record);
+                    
+                    Notification::make()
+                        ->title('Template published')
+                        ->success()
+                        ->send();
                 }),
             Actions\Action::make('revert')
                 ->label('Revert')
@@ -98,6 +155,11 @@ class EditBuilderTemplate extends EditRecord
                         $version,
                         (bool) $data['publish_after_revert']
                     );
+                    
+                    Notification::make()
+                        ->title('Template reverted')
+                        ->success()
+                        ->send();
                 }),
         ];
     }

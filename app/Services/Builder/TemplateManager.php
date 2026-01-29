@@ -62,8 +62,81 @@ class TemplateManager
             $name = $title ?: Str::title(str_replace('-', ' ', $popupKey));
             $html = $this->getDefaultPopupHtml($name, $fullKey);
 
-            $this->createOrUpdateDefaultTemplate($fullKey, $html, self::POPUP_TYPE, $name);
+            $template = $this->createOrUpdateDefaultPopupTemplate($fullKey, $html, $name);
         }
+    }
+
+    /**
+     * Create or update a default popup template with auto-publish.
+     */
+    private function createOrUpdateDefaultPopupTemplate(
+        string $key,
+        string $defaultHtml,
+        string $name
+    ): BuilderTemplate {
+        $parts = $this->splitTemplateParts($defaultHtml);
+
+        $template = BuilderTemplate::query()->firstOrCreate(
+            ['scope' => config('builder.scope'), 'key' => $key],
+            [
+                'name' => $name,
+                'type' => self::POPUP_TYPE,
+                'draft_html' => $parts['html'],
+                'draft_css' => $parts['css'],
+                'draft_js' => $parts['js'],
+                'published_html' => $parts['html'], // Auto-publish
+                'published_css' => $parts['css'],
+                'published_js' => $parts['js'],
+                'is_override_enabled' => true, // Enable override so popups are shown
+                'created_by' => auth()->id() ?? 1,
+                'updated_by' => auth()->id() ?? 1,
+            ]
+        );
+
+        // Always update popups to ensure they have the latest content
+        // Check if content needs updating (contains placeholder or missing dynamic content)
+        $publishedHtml = $template->published_html ?? '';
+        $hasPlaceholder = str_contains($publishedHtml, 'Add your content here')
+            || str_contains($publishedHtml, 'portal.example')
+            || str_contains($publishedHtml, 'newsletter.example')
+            || str_contains($publishedHtml, 'Class portal')
+            || str_contains($publishedHtml, 'Weekly newsletter')
+            || str_contains($publishedHtml, 'Helpful resources for students')
+            || str_contains($publishedHtml, 'Math worksheet')
+            || str_contains($publishedHtml, 'Reading pages');
+        
+        // Check if popup should have dynamic content but doesn't
+        $shouldHaveDynamicContent = in_array($key, [
+            $this->resolvePopupKey('whatsapp'),
+            $this->resolvePopupKey('important-links'),
+            $this->resolvePopupKey('holidays'),
+            $this->resolvePopupKey('children'),
+            $this->resolvePopupKey('contacts'),
+            $this->resolvePopupKey('links'),
+        ]);
+        
+        // Force update if template was manually edited but should have default content
+        $needsUpdate = $this->shouldSeedTemplate($template) 
+            || $this->shouldReplaceTemplateDraft($template, $key) 
+            || !$template->published_html
+            || $hasPlaceholder
+            || ($shouldHaveDynamicContent && !str_contains($publishedHtml, '$page['))
+            || ($shouldHaveDynamicContent && !str_contains($publishedHtml, '@if'));
+
+        if ($needsUpdate && $defaultHtml) {
+            $template->update([
+                'draft_html' => $parts['html'],
+                'draft_css' => $parts['css'],
+                'draft_js' => $parts['js'],
+                'published_html' => $parts['html'], // Auto-publish
+                'published_css' => $parts['css'],
+                'published_js' => $parts['js'],
+                'is_override_enabled' => true, // Enable override
+                'updated_by' => auth()->id() ?? 1,
+            ]);
+        }
+
+        return $template;
     }
 
     /**
@@ -205,7 +278,7 @@ class TemplateManager
     /**
      * Build the default classroom page HTML.
      */
-    private function getDefaultClassroomPageHtml(): string
+    public function getDefaultClassroomPageHtml(): string
     {
         return <<<'HTML'
 <style>
@@ -508,8 +581,27 @@ class TemplateManager
 
 <script>
   (function () {
+    // Wait for DOM to be fully loaded
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initClassroomPage);
+    } else {
+      initClassroomPage();
+    }
+
+    function initClassroomPage() {
+    // Wait for DOM to be ready and popups to be rendered
+    if (document.readyState === 'complete') {
+      setupClassroomPageFeatures();
+    } else {
+      window.addEventListener('load', () => {
+        setTimeout(setupClassroomPageFeatures, 200);
+      });
+    }
+    }
+
+    function setupClassroomPageFeatures() {
     const dayNames = Array.from(document.querySelectorAll('.day-tab'))
-      .map((tab) => (tab.textContent || '').trim());
+      .map((tab) => (tab && tab.textContent) ? tab.textContent.trim() : '');
     const timetable = {!! json_encode($page['timetable'] ?? []) !!};
     const selectedDayNameEl = document.getElementById('selected-day-name');
     const scheduleEl = document.getElementById('schedule-content');
@@ -594,12 +686,18 @@ class TemplateManager
       });
     }
 
+    // Safely get popup content elements
     const contentPopupTitle = document.getElementById('popup-content-title');
     const contentPopupType = document.getElementById('popup-content-type');
     const contentPopupBody = document.getElementById('popup-content-body');
     const contentPopupDate = document.getElementById('popup-content-date');
     const contentPopupTime = document.getElementById('popup-content-time');
     const contentPopupLocation = document.getElementById('popup-content-location');
+    
+    // Log if popup elements are missing (for debugging)
+    if (!contentPopupTitle || !contentPopupType || !contentPopupBody) {
+      console.warn('Some popup content elements are missing. Popup may not work correctly.');
+    }
     const typeLabels = {
       message: 'הודעה',
       event: 'אירוע',
@@ -607,29 +705,41 @@ class TemplateManager
     };
 
     const setContentPopup = (dataset) => {
-      const type = dataset.itemType || 'message';
-      if (contentPopupType) {
-        contentPopupType.textContent = typeLabels[type] || type;
-      }
-      if (contentPopupTitle) {
-        contentPopupTitle.textContent = dataset.itemTitle || '';
-      }
-      if (contentPopupBody) {
-        contentPopupBody.textContent = dataset.itemContent || '';
-      }
-      if (contentPopupDate) {
-        contentPopupDate.textContent = dataset.itemDate || '';
-      }
-      if (contentPopupTime) {
-        contentPopupTime.textContent = dataset.itemTime || '';
-      }
-      if (contentPopupLocation) {
-        contentPopupLocation.textContent = dataset.itemLocation || '';
+      if (!dataset || typeof dataset !== 'object') return;
+      try {
+        const type = dataset.itemType || 'message';
+        if (contentPopupType) {
+          contentPopupType.textContent = typeLabels[type] || type;
+        }
+        if (contentPopupTitle) {
+          contentPopupTitle.textContent = dataset.itemTitle || '';
+        }
+        if (contentPopupBody) {
+          contentPopupBody.textContent = dataset.itemContent || '';
+        }
+        if (contentPopupDate) {
+          contentPopupDate.textContent = dataset.itemDate || '';
+        }
+        if (contentPopupTime) {
+          contentPopupTime.textContent = dataset.itemTime || '';
+        }
+        if (contentPopupLocation) {
+          contentPopupLocation.textContent = dataset.itemLocation || '';
+        }
+      } catch (err) {
+        console.error('Error setting content popup:', err);
       }
     };
 
     const backdrop = document.querySelector('[data-popup-backdrop]');
     const popups = document.querySelectorAll('[data-popup]');
+    
+    // Log popup count for debugging
+    if (popups.length === 0) {
+      console.warn('No popups found in DOM. Popups may not be rendered correctly.');
+    } else {
+      console.log(`Found ${popups.length} popups in DOM.`);
+    }
 
     const closePopups = () => {
       popups.forEach((popup) => popup.classList.remove('is-open'));
@@ -637,49 +747,126 @@ class TemplateManager
     };
 
     const openPopup = (popupId) => {
-      const target = document.getElementById(popupId);
-      if (!target) return;
-      popups.forEach((popup) => popup.classList.remove('is-open'));
-      target.classList.add('is-open');
-      backdrop?.classList.add('is-open');
+      try {
+        if (!popupId) {
+          console.warn('openPopup: popupId is empty');
+          return;
+        }
+        const target = document.getElementById(popupId);
+        if (!target) {
+          console.warn('Popup not found:', popupId, 'Available popups:', Array.from(document.querySelectorAll('[data-popup]')).map(p => p.id));
+          return;
+        }
+        if (popups && popups.length > 0) {
+          popups.forEach((popup) => {
+            if (popup) popup.classList.remove('is-open');
+          });
+        }
+        target.classList.add('is-open');
+        if (backdrop) {
+          backdrop.classList.add('is-open');
+        }
+      } catch (err) {
+        console.error('Error opening popup:', err, 'popupId:', popupId);
+      }
     };
 
-    document.querySelectorAll('[data-item-popup]').forEach((trigger) => {
-      trigger.addEventListener('click', (event) => {
-        event.preventDefault();
-        const targetId = trigger.getAttribute('data-item-popup');
-        if (!targetId) return;
-        setContentPopup(trigger.dataset);
-        openPopup(targetId);
-      });
-    });
+    // Setup popup triggers with error handling
+    try {
+      const itemPopupTriggers = document.querySelectorAll('[data-item-popup]');
+      if (itemPopupTriggers && itemPopupTriggers.length > 0) {
+        itemPopupTriggers.forEach((trigger) => {
+          if (!trigger || typeof trigger.addEventListener !== 'function') return;
+          try {
+            trigger.addEventListener('click', (event) => {
+              try {
+                event.preventDefault();
+                event.stopPropagation();
+                if (!trigger) return;
+                // Safe dataset access
+                let dataset = {};
+                try {
+                  if (trigger && trigger.dataset) {
+                    dataset = trigger.dataset;
+                  }
+                } catch (e) {
+                  console.warn('Could not access trigger dataset:', e);
+                }
+                const targetId = trigger.getAttribute('data-item-popup');
+                if (!targetId) return;
+                setContentPopup(dataset);
+                openPopup(targetId);
+              } catch (err) {
+                console.error('Error handling item popup click:', err);
+              }
+            });
+          } catch (err) {
+            console.error('Error adding event listener to trigger:', err);
+          }
+        });
+      }
+    } catch (err) {
+      console.error('Error setting up item popup triggers:', err);
+    }
 
-    document.querySelectorAll('[data-popup-target]').forEach((trigger) => {
-      trigger.addEventListener('click', (event) => {
-        event.preventDefault();
-        const target = trigger.getAttribute('data-popup-target');
-        if (target) {
-          openPopup(target);
-        }
-      });
-    });
+    try {
+      const popupTargetTriggers = document.querySelectorAll('[data-popup-target]');
+      if (popupTargetTriggers && popupTargetTriggers.length > 0) {
+        popupTargetTriggers.forEach((trigger) => {
+          if (!trigger || typeof trigger.addEventListener !== 'function') return;
+          try {
+            trigger.addEventListener('click', (event) => {
+              try {
+                event.preventDefault();
+                event.stopPropagation();
+                if (!trigger) return;
+                const target = trigger.getAttribute('data-popup-target');
+                if (target) {
+                  openPopup(target);
+                }
+              } catch (err) {
+                console.error('Error handling popup target click:', err);
+              }
+            });
+          } catch (err) {
+            console.error('Error adding event listener to popup target:', err);
+          }
+        });
+      }
+    } catch (err) {
+      console.error('Error setting up popup target triggers:', err);
+    }
 
-    document.querySelectorAll('[data-popup-close]').forEach((button) => {
-      button.addEventListener('click', (event) => {
-        event.preventDefault();
-        closePopups();
-      });
-    });
+    try {
+      const closeButtons = document.querySelectorAll('[data-popup-close]');
+      if (closeButtons && closeButtons.length > 0) {
+        closeButtons.forEach((button) => {
+          if (!button || typeof button.addEventListener !== 'function') return;
+          button.addEventListener('click', (event) => {
+            event.preventDefault();
+            closePopups();
+          });
+        });
+      }
+    } catch (err) {
+      console.error('Error setting up close buttons:', err);
+    }
 
-    backdrop?.addEventListener('click', closePopups);
+    if (backdrop && typeof backdrop.addEventListener === 'function') {
+      backdrop.addEventListener('click', closePopups);
+    }
 
     // Handle child contacts toggle
     document.querySelectorAll('.child-name').forEach((nameEl) => {
+      if (!nameEl) return;
       nameEl.addEventListener('click', (e) => {
         e.stopPropagation();
+        e.preventDefault();
+        if (!nameEl) return;
         const childRow = nameEl.closest('.child-row');
         if (!childRow) return;
         const childId = childRow.getAttribute('data-child-id');
+        if (!childId) return;
         const contactsEl = document.querySelector(`.child-contacts[data-child-id="${childId}"]`);
         if (contactsEl) {
           contactsEl.style.display = contactsEl.style.display === 'none' ? 'block' : 'none';
@@ -689,8 +876,11 @@ class TemplateManager
 
     // Handle announcement toggle
     document.querySelectorAll('.notice-check').forEach((checkEl) => {
+      if (!checkEl) return;
       checkEl.addEventListener('click', async (e) => {
         e.stopPropagation();
+        e.preventDefault();
+        if (!checkEl) return;
         const noticeRow = checkEl.closest('.notice-row');
         if (!noticeRow) return;
         const announcementId = noticeRow.getAttribute('data-announcement-id');
@@ -727,8 +917,11 @@ class TemplateManager
 
     // Handle add to calendar
     document.querySelectorAll('.add-to-calendar-btn').forEach((btn) => {
+      if (!btn) return;
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
+        e.preventDefault();
+        if (!btn) return;
         const date = btn.getAttribute('data-event-date') || '';
         const time = btn.getAttribute('data-event-time') || '';
         const title = btn.getAttribute('data-event-title') || '';
@@ -801,6 +994,7 @@ class TemplateManager
         animation.onfinish = () => confetti.remove();
       }
     }
+    } // End of setupClassroomPageFeatures
   })();
 </script>
 <style>
@@ -843,7 +1037,7 @@ HTML;
     /**
      * Build the default popup HTML.
      */
-    private function getDefaultPopupHtml(string $title, string $key): string
+    public function getDefaultPopupHtml(string $title, string $key): string
     {
         $id = $this->getPopupIdFromKey($key);
         $body = $this->getPopupBodyHtml($key);
@@ -1069,7 +1263,7 @@ HTML;
     /**
      * Build popup body HTML by key.
      */
-    private function getPopupBodyHtml(string $key): string
+    public function getPopupBodyHtml(string $key): string
     {
         $shortKey = Str::after($key, (string) config('builder.popup_prefix'));
 
@@ -1344,7 +1538,7 @@ HTML;
      *
      * @return array{html: string, css: string|null, js: string|null}
      */
-    private function splitTemplateParts(string $html): array
+    public function splitTemplateParts(string $html): array
     {
         $css = null;
         $js = null;
