@@ -1097,7 +1097,7 @@ class TemplateManager
           contentPopupLocation.textContent = dataset.itemLocation || '';
         }
       } catch (err) {
-        console.error('Error setting content popup:', err);
+        // Silently fail to avoid console noise
       }
     };
 
@@ -1160,14 +1160,14 @@ class TemplateManager
                     dataset = trigger.dataset;
                   }
                 } catch (e) {
-                  console.warn('Could not access trigger dataset:', e);
+                  // Ignore
                 }
                 const targetId = trigger.getAttribute('data-item-popup');
                 if (!targetId) return;
                 setContentPopup(dataset);
                 openPopup(targetId);
               } catch (err) {
-                console.error('Error handling item popup click:', err);
+                // Ignore
               }
             });
           } catch (err) {
