@@ -534,12 +534,16 @@ class TemplateManager
 
   <div class="card" style="display:flex; justify-content:space-between; align-items:center; padding:12px 20px;">
     <div style="flex: 1;">
-      <div class="weather-text">{{ $page['weather']['text'] ?? ($page['weather_text'] ?? '16-20° - מזג אוויר נוח.') }}</div>
+      <div class="weather-text">{{ $page['weather']['text'] ?? '16-20° - מזג אוויר נוח.' }}</div>
       @if (!empty($page['weather']['recommendation']))
         <div style="font-size: 0.85em; color: #666; margin-top: 4px;">{{ $page['weather']['recommendation'] }}</div>
       @endif
     </div>
-    <span style="font-size:24px;">{{ $page['weather']['icon'] ?? '☀️' }}</span>
+    @if (!empty($page['weather']['icon']) && (str_starts_with($page['weather']['icon'], 'http') || str_starts_with($page['weather']['icon'], '/')))
+      <img src="{{ $page['weather']['icon'] }}" alt="Weather Icon" style="width: 32px; height: 32px; object-fit: contain;" />
+    @else
+      <span style="font-size:24px;">{{ $page['weather']['icon'] ?? '☀️' }}</span>
+    @endif
   </div>
 
   <div class="card" style="padding-bottom: 70px;">
@@ -761,7 +765,7 @@ class TemplateManager
           הוסף קובץ
         </label>
 
-        @if(($page['can_manage'] ?? false) || ($page['classroom']['allow_member_posting'] ?? false))
+        @if(($page['can_manage'] ?? false) || (($page['classroom']['allow_member_posting'] ?? false)))
           <div class="visibility-option">
             <label class="toggle-switch">
               <input type="checkbox" id="quick-add-is-public" checked>
@@ -832,19 +836,199 @@ class TemplateManager
       try {
         // Quick Add Logic
         const quickAddTrigger = document.getElementById('ai-quick-add-trigger');
-        // ... rest of the code ...
+        const quickAddPopup = document.getElementById('popup-quick-add');
+        const quickAddText = document.getElementById('quick-add-text');
+        const quickAddFile = document.getElementById('quick-add-file');
+        const quickAddFilePreview = document.getElementById('quick-add-file-preview');
+        const quickAddFileName = document.getElementById('file-name');
+        const removeFileBtn = document.getElementById('remove-file');
+        const quickAddSubmit = document.getElementById('quick-add-submit');
+        const quickAddIsPublic = document.getElementById('quick-add-is-public');
+        const aiConfirmPopup = document.getElementById('popup-ai-confirm');
+        const aiConfirmSave = document.getElementById('ai-confirm-save');
+        const aiSuggestionContent = document.getElementById('ai-suggestion-content');
+        
+        let selectedFile = null;
+        let aiSuggestionData = null;
+        const classroomId = {{ ($page['classroom']['id'] ?? $classroom->id ?? null) ?: 'null' }};
+
+        // Open quick add popup
+        if (quickAddTrigger && quickAddPopup) {
+          quickAddTrigger.addEventListener('click', () => {
+            quickAddPopup.classList.add('is-open');
+            const backdrop = document.querySelector('[data-popup-backdrop]');
+            if (backdrop) backdrop.classList.add('is-open');
+          });
+        }
+
+        // File selection
+        if (quickAddFile && quickAddFilePreview && quickAddFileName) {
+          quickAddFile.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+              selectedFile = file;
+              quickAddFileName.textContent = file.name;
+              quickAddFilePreview.style.display = 'block';
+            }
+          });
+        }
+
+        // Remove file
+        if (removeFileBtn && quickAddFile && quickAddFilePreview) {
+          removeFileBtn.addEventListener('click', () => {
+            selectedFile = null;
+            quickAddFile.value = '';
+            quickAddFilePreview.style.display = 'none';
+          });
+        }
+
+        // Submit quick add - send to AI
+        if (quickAddSubmit && quickAddText) {
+          quickAddSubmit.addEventListener('click', async () => {
+            // Validate classroomId
+            if (!classroomId || classroomId === 'null') {
+              alert('שגיאה: לא נמצא מזהה כיתה');
+              return;
+            }
+
+            const text = quickAddText.value.trim();
+            if (!text && !selectedFile) {
+              alert('אנא הזן טקסט או בחר קובץ');
+              return;
+            }
+
+            quickAddSubmit.disabled = true;
+            quickAddSubmit.textContent = 'מנתח...';
+
+            try {
+              const formData = new FormData();
+              if (text) formData.append('text', text);
+              if (selectedFile) formData.append('file', selectedFile);
+
+              const response = await fetch(`/class/${classroomId}/ai-analyze`, {
+                method: 'POST',
+                headers: {
+                  'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+                body: formData,
+              });
+
+              if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || 'שגיאה בניתוח');
+              }
+
+              const data = await response.json();
+              aiSuggestionData = data;
+              
+              // Show AI suggestion popup
+              if (aiSuggestionContent) {
+                const typeLabel = data.type === 'event' ? 'אירוע' : data.type === 'homework' ? 'שיעורי בית' : 'הודעה';
+                aiSuggestionContent.innerHTML = `
+                  <div style="margin-bottom: 16px;">
+                    <strong>סוג:</strong> ${typeLabel}<br>
+                    <strong>כותרת:</strong> ${data.title || ''}<br>
+                    <strong>תוכן:</strong> ${data.content || ''}<br>
+                    ${data.date ? `<strong>תאריך:</strong> ${data.date}<br>` : ''}
+                    ${data.time ? `<strong>שעה:</strong> ${data.time}<br>` : ''}
+                  </div>
+                `;
+              }
+
+              // Close quick add popup
+              if (quickAddPopup) {
+                quickAddPopup.classList.remove('is-open');
+              }
+              const backdrop = document.querySelector('[data-popup-backdrop]');
+              if (backdrop) backdrop.classList.remove('is-open');
+
+              // Open AI confirm popup
+              if (aiConfirmPopup) {
+                aiConfirmPopup.classList.add('is-open');
+                if (backdrop) backdrop.classList.add('is-open');
+              }
+
+            } catch (error) {
+              console.error('Error analyzing:', error);
+              alert('שגיאה בניתוח: ' + (error.message || 'שגיאה לא ידועה'));
+            } finally {
+              quickAddSubmit.disabled = false;
+              quickAddSubmit.textContent = 'המשך';
+            }
+          });
+        }
+
+        // Save AI suggestion
+        if (aiConfirmSave) {
+          aiConfirmSave.addEventListener('click', async () => {
+            if (!aiSuggestionData) return;
+
+            // Validate classroomId
+            if (!classroomId || classroomId === 'null') {
+              alert('שגיאה: לא נמצא מזהה כיתה');
+              return;
+            }
+
+            aiConfirmSave.disabled = true;
+            aiConfirmSave.textContent = 'שומר...';
+
+            try {
+              const isPublic = quickAddIsPublic ? quickAddIsPublic.checked : false;
+              
+              const response = await fetch(`/class/${classroomId}/ai-store`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+                body: JSON.stringify({
+                  ...aiSuggestionData,
+                  is_public: isPublic,
+                }),
+              });
+
+              if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || 'שגיאה בשמירה');
+              }
+
+              // Close popups and reset form
+              if (aiConfirmPopup) {
+                aiConfirmPopup.classList.remove('is-open');
+              }
+              const backdrop = document.querySelector('[data-popup-backdrop]');
+              if (backdrop) backdrop.classList.remove('is-open');
+
+              if (quickAddText) quickAddText.value = '';
+              if (quickAddFile) quickAddFile.value = '';
+              if (quickAddFilePreview) quickAddFilePreview.style.display = 'none';
+              selectedFile = null;
+              aiSuggestionData = null;
+
+              // Reload page to show new content
+              window.location.reload();
+
+            } catch (error) {
+              console.error('Error saving:', error);
+              alert('שגיאה בשמירה: ' + (error.message || 'שגיאה לא ידועה'));
+            } finally {
+              aiConfirmSave.disabled = false;
+              aiConfirmSave.textContent = 'אשר ושמור';
+            }
+          });
+        }
       } catch (err) {
         console.error('Error in setupClassroomPageFeatures:', err);
       }
-    }
 
-    const dayNames = Array.from(document.querySelectorAll('.day-tab'))
-      .map((tab) => (tab && tab.textContent) ? tab.textContent.trim() : '');
-    const timetable = {!! json_encode($page['timetable'] ?? []) !!};
-    const selectedDayNameEl = document.getElementById('selected-day-name');
-    const scheduleEl = document.getElementById('schedule-content');
+      // Day selection and schedule rendering
+      const dayNames = Array.from(document.querySelectorAll('.day-tab'))
+        .map((tab) => (tab && tab.textContent) ? tab.textContent.trim() : '');
+      const timetable = {!! json_encode($page['timetable'] ?? []) !!};
+      const selectedDayNameEl = document.getElementById('selected-day-name');
+      const scheduleEl = document.getElementById('schedule-content');
 
-    const buildScheduleHtml = (entries) => {
+      const buildScheduleHtml = (entries) => {
       if (!Array.isArray(entries) || entries.length === 0) {
         return '<div class="schedule-row"><span class="schedule-subject">---</span><span class="schedule-time">08:00-09:00</span></div>';
       }
@@ -858,46 +1042,46 @@ class TemplateManager
       }).join('');
     };
 
-    const renderSchedule = (dayIndex) => {
-      if (!scheduleEl) return;
-      const name = dayNames[dayIndex] || '';
-      if (selectedDayNameEl) {
-        selectedDayNameEl.textContent = name;
-      }
-      scheduleEl.innerHTML = buildScheduleHtml(timetable[dayIndex] || []);
-    };
+      const renderSchedule = (dayIndex) => {
+        if (!scheduleEl) return;
+        const name = dayNames[dayIndex] || '';
+        if (selectedDayNameEl) {
+          selectedDayNameEl.textContent = name;
+        }
+        scheduleEl.innerHTML = buildScheduleHtml(timetable[dayIndex] || []);
+      };
 
-    document.querySelectorAll('.day-tab').forEach((tab) => {
+      document.querySelectorAll('.day-tab').forEach((tab) => {
       tab.addEventListener('click', () => {
         document.querySelectorAll('.day-tab').forEach((item) => item.classList.remove('active'));
         tab.classList.add('active');
         const dayIndex = parseInt(tab.getAttribute('data-day') || '0', 10);
         renderSchedule(dayIndex);
       });
-    });
+      });
 
-    const initialTab = document.querySelector('.day-tab.active');
-    if (initialTab) {
-      const dayIndex = parseInt(initialTab.getAttribute('data-day') || '0', 10);
-      renderSchedule(dayIndex);
-    }
+      const initialTab = document.querySelector('.day-tab.active');
+      if (initialTab) {
+        const dayIndex = parseInt(initialTab.getAttribute('data-day') || '0', 10);
+        renderSchedule(dayIndex);
+      }
 
-    const list = document.getElementById('draggable-list');
-    let draggingItem = null;
+      const list = document.getElementById('draggable-list');
+      let draggingItem = null;
 
-    const getDragAfterElement = (container, y) => {
+      const getDragAfterElement = (container, y) => {
       const draggableElements = [...container.querySelectorAll('.link-card:not([style*="opacity: 0.5"])')];
-      return draggableElements.reduce((closest, child) => {
-        const box = child.getBoundingClientRect();
-        const offset = y - box.top - box.height / 2;
-        if (offset < 0 && offset > closest.offset) {
-          return { offset: offset, element: child };
-        }
-        return closest;
-      }, { offset: Number.NEGATIVE_INFINITY }).element;
-    };
+        return draggableElements.reduce((closest, child) => {
+          const box = child.getBoundingClientRect();
+          const offset = y - box.top - box.height / 2;
+          if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+          }
+          return closest;
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+      };
 
-    if (list) {
+      if (list) {
       list.addEventListener('dragstart', (event) => {
         const target = event.target;
         if (!(target instanceof HTMLElement)) return;
@@ -921,28 +1105,28 @@ class TemplateManager
         } else {
           list.insertBefore(draggingItem, afterElement);
         }
-      });
-    }
+        });
+      }
 
-    // Safely get popup content elements
-    const contentPopupTitle = document.getElementById('popup-content-title');
-    const contentPopupType = document.getElementById('popup-content-type');
-    const contentPopupBody = document.getElementById('popup-content-body');
-    const contentPopupDate = document.getElementById('popup-content-date');
-    const contentPopupTime = document.getElementById('popup-content-time');
-    const contentPopupLocation = document.getElementById('popup-content-location');
-    
-    // Log if popup elements are missing (for debugging)
-    if (!contentPopupTitle || !contentPopupType || !contentPopupBody) {
-      console.warn('Some popup content elements are missing. Popup may not work correctly.');
-    }
-    const typeLabels = {
-      message: 'הודעה',
-      event: 'אירוע',
-      homework: 'שיעורי בית',
-    };
+      // Safely get popup content elements
+      const contentPopupTitle = document.getElementById('popup-content-title');
+      const contentPopupType = document.getElementById('popup-content-type');
+      const contentPopupBody = document.getElementById('popup-content-body');
+      const contentPopupDate = document.getElementById('popup-content-date');
+      const contentPopupTime = document.getElementById('popup-content-time');
+      const contentPopupLocation = document.getElementById('popup-content-location');
+      
+      // Log if popup elements are missing (for debugging)
+      if (!contentPopupTitle || !contentPopupType || !contentPopupBody) {
+        console.warn('Some popup content elements are missing. Popup may not work correctly.');
+      }
+      const typeLabels = {
+        message: 'הודעה',
+        event: 'אירוע',
+        homework: 'שיעורי בית',
+      };
 
-    const setContentPopup = (dataset) => {
+      const setContentPopup = (dataset) => {
       if (!dataset) return;
       try {
         const type = dataset.itemType || 'message';
@@ -964,27 +1148,27 @@ class TemplateManager
         if (contentPopupLocation) {
           contentPopupLocation.textContent = dataset.itemLocation || '';
         }
-      } catch (err) {
-        // Silently fail
+        } catch (err) {
+          // Silently fail
+        }
+      };
+
+      const backdrop = document.querySelector('[data-popup-backdrop]');
+      const popups = document.querySelectorAll('[data-popup]');
+      
+      // Log popup count for debugging
+      if (popups.length === 0) {
+        console.warn('No popups found in DOM. Popups may not be rendered correctly.');
+      } else {
+        console.log(`Found ${popups.length} popups in DOM.`);
       }
-    };
 
-    const backdrop = document.querySelector('[data-popup-backdrop]');
-    const popups = document.querySelectorAll('[data-popup]');
-    
-    // Log popup count for debugging
-    if (popups.length === 0) {
-      console.warn('No popups found in DOM. Popups may not be rendered correctly.');
-    } else {
-      console.log(`Found ${popups.length} popups in DOM.`);
-    }
+      const closePopups = () => {
+        popups.forEach((popup) => popup.classList.remove('is-open'));
+        backdrop?.classList.remove('is-open');
+      };
 
-    const closePopups = () => {
-      popups.forEach((popup) => popup.classList.remove('is-open'));
-      backdrop?.classList.remove('is-open');
-    };
-
-    const openPopup = (popupId) => {
+      const openPopup = (popupId) => {
       try {
         if (!popupId) {
           console.warn('openPopup: popupId is empty');
@@ -1004,14 +1188,14 @@ class TemplateManager
         if (backdrop) {
           backdrop.classList.add('is-open');
         }
-      } catch (err) {
-        console.error('Error opening popup:', err, 'popupId:', popupId);
-      }
-    };
+        } catch (err) {
+          console.error('Error opening popup:', err, 'popupId:', popupId);
+        }
+      };
 
-    // Setup popup triggers with error handling
-    try {
-      const itemPopupTriggers = document.querySelectorAll('[data-item-popup]');
+      // Setup popup triggers with error handling
+      try {
+        const itemPopupTriggers = document.querySelectorAll('[data-item-popup]');
       if (itemPopupTriggers && itemPopupTriggers.length > 0) {
         itemPopupTriggers.forEach((trigger) => {
           if (!trigger || typeof trigger.addEventListener !== 'function') return;
@@ -1041,14 +1225,14 @@ class TemplateManager
           } catch (err) {
             console.error('Error adding event listener to trigger:', err);
           }
-        });
+          });
+        }
+      } catch (err) {
+        console.error('Error setting up item popup triggers:', err);
       }
-    } catch (err) {
-      console.error('Error setting up item popup triggers:', err);
-    }
 
-    try {
-      const popupTargetTriggers = document.querySelectorAll('[data-popup-target]');
+      try {
+        const popupTargetTriggers = document.querySelectorAll('[data-popup-target]');
       if (popupTargetTriggers && popupTargetTriggers.length > 0) {
         popupTargetTriggers.forEach((trigger) => {
           if (!trigger || typeof trigger.addEventListener !== 'function') return;
@@ -1069,14 +1253,14 @@ class TemplateManager
           } catch (err) {
             console.error('Error adding event listener to popup target:', err);
           }
-        });
+          });
+        }
+      } catch (err) {
+        console.error('Error setting up popup target triggers:', err);
       }
-    } catch (err) {
-      console.error('Error setting up popup target triggers:', err);
-    }
 
-    try {
-      const closeButtons = document.querySelectorAll('[data-popup-close]');
+      try {
+        const closeButtons = document.querySelectorAll('[data-popup-close]');
       if (closeButtons && closeButtons.length > 0) {
         closeButtons.forEach((button) => {
           if (!button || typeof button.addEventListener !== 'function') return;
@@ -1084,18 +1268,18 @@ class TemplateManager
             event.preventDefault();
             closePopups();
           });
-        });
+          });
+        }
+      } catch (err) {
+        console.error('Error setting up close buttons:', err);
       }
-    } catch (err) {
-      console.error('Error setting up close buttons:', err);
-    }
 
-    if (backdrop && typeof backdrop.addEventListener === 'function') {
-      backdrop.addEventListener('click', closePopups);
-    }
+      if (backdrop && typeof backdrop.addEventListener === 'function') {
+        backdrop.addEventListener('click', closePopups);
+      }
 
-    // Handle child contacts toggle
-    document.querySelectorAll('.child-name').forEach((nameEl) => {
+      // Handle child contacts toggle
+      document.querySelectorAll('.child-name').forEach((nameEl) => {
       if (!nameEl) return;
       nameEl.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1108,12 +1292,12 @@ class TemplateManager
         const contactsEl = document.querySelector(`.child-contacts[data-child-id="${childId}"]`);
         if (contactsEl) {
           contactsEl.style.display = contactsEl.style.display === 'none' ? 'block' : 'none';
-        }
+          }
+        });
       });
-    });
 
-    // Handle announcement toggle
-    document.querySelectorAll('.notice-check').forEach((checkEl) => {
+      // Handle announcement toggle
+      document.querySelectorAll('.notice-check').forEach((checkEl) => {
       if (!checkEl) return;
       checkEl.addEventListener('click', async (e) => {
         e.stopPropagation();
@@ -1149,12 +1333,12 @@ class TemplateManager
           }
         } catch (error) {
           console.error('Failed to toggle announcement:', error);
-        }
+          }
+        });
       });
-    });
 
-    // Handle add to calendar
-    document.querySelectorAll('.add-to-calendar-btn').forEach((btn) => {
+      // Handle add to calendar
+      document.querySelectorAll('.add-to-calendar-btn').forEach((btn) => {
       if (!btn) return;
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1196,13 +1380,13 @@ class TemplateManager
         link.download = `${title.replace(/[^a-z0-9]/gi, '_')}.ics`;
         document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        });
       });
-    });
 
-    // Confetti effect function
-    function createConfetti() {
+      // Confetti effect function
+      function createConfetti() {
       const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#6c5ce7'];
       const confettiCount = 50;
       
@@ -1229,9 +1413,9 @@ class TemplateManager
           easing: 'cubic-bezier(0.5, 0, 0.5, 1)',
         });
         
-        animation.onfinish = () => confetti.remove();
+          animation.onfinish = () => confetti.remove();
+        }
       }
-    }
     } // End of setupClassroomPageFeatures
   })();
 </script>

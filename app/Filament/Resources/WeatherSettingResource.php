@@ -24,53 +24,67 @@ class WeatherSettingResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            Forms\Components\Section::make('API Configuration')
+            Forms\Components\Section::make('Classroom Selection')
                 ->schema([
                     Forms\Components\Select::make('classroom_id')
                         ->label('Classroom')
                         ->relationship('classroom', 'name')
                         ->required()
                         ->searchable()
-                        ->preload(),
-                    Forms\Components\Select::make('api_provider')
-                        ->label('API Provider')
-                        ->options([
-                            'openweathermap' => 'OpenWeatherMap',
-                        ])
-                        ->default('openweathermap')
-                        ->required(),
-                    Forms\Components\TextInput::make('api_key')
-                        ->label('API Key')
-                        ->password()
-                        ->maxLength(255)
-                        ->helperText('Get your API key from https://openweathermap.org/api'),
-                    Forms\Components\TextInput::make('city_name')
-                        ->label('City Name')
-                        ->maxLength(255)
-                        ->helperText('City name for weather lookup (e.g., "Tel Aviv" or "Jerusalem")')
-                        ->required(),
-                ])
-                ->columns(2),
+                        ->preload()
+                        ->helperText('The city will be automatically pulled from the classroom\'s city association.'),
+                ]),
             
             Forms\Components\Section::make('Weather Display Settings')
                 ->description('Configure how weather information is displayed on the classroom page')
                 ->schema([
-                    Forms\Components\KeyValue::make('icon_mapping')
-                        ->label('Weather Icons')
-                        ->keyLabel('Condition')
-                        ->valueLabel('Emoji Icon')
-                        ->helperText('Map weather conditions to emoji icons that will be displayed on the classroom page.')
-                        ->default([
-                            'hot' => '☀️',
-                            'warm' => '☀️',
-                            'mild' => '⛅',
-                            'cool' => '☁️',
-                            'cold' => '❄️',
-                            'rain' => '🌧️',
-                            'default' => '☀️',
+                    Forms\Components\Repeater::make('temperature_ranges')
+                        ->label('Temperature Ranges')
+                        ->schema([
+                            Forms\Components\TextInput::make('range')
+                                ->label('Temperature Range')
+                                ->required()
+                                ->placeholder('e.g., 25-30 or 25+ or -10')
+                                ->helperText('Format: "min-max" (e.g., 20-25), "min+" (e.g., 25+), or "-max" (e.g., -10)'),
+                            Forms\Components\TextInput::make('condition_key')
+                                ->label('Condition Key')
+                                ->required()
+                                ->placeholder('e.g., hot, warm, mild')
+                                ->helperText('This key will be used to map to the icon below'),
                         ])
-                        ->addable(true)
-                        ->deletable(true)
+                        ->defaultItems(0)
+                        ->addActionLabel('Add Temperature Range')
+                        ->reorderable(true)
+                        ->columnSpanFull(),
+                    
+                    Forms\Components\Repeater::make('icon_mapping')
+                        ->label('Weather Icons')
+                        ->schema([
+                            Forms\Components\TextInput::make('condition')
+                                ->label('Condition Key')
+                                ->required()
+                                ->placeholder('e.g., hot, warm, mild, cool, cold, rain, default')
+                                ->helperText('Must match the condition keys from temperature ranges'),
+                            Forms\Components\FileUpload::make('icon')
+                                ->label('SVG Icon')
+                                ->disk('public')
+                                ->directory('weather-icons')
+                                ->acceptedFileTypes(['image/svg+xml'])
+                                ->maxSize(512) // 512 KB
+                                ->helperText('Upload an SVG file for this weather condition')
+                                ->required(),
+                        ])
+                        ->defaultItems(7)
+                        ->default([
+                            ['condition' => 'hot', 'icon' => null],
+                            ['condition' => 'warm', 'icon' => null],
+                            ['condition' => 'mild', 'icon' => null],
+                            ['condition' => 'cool', 'icon' => null],
+                            ['condition' => 'cold', 'icon' => null],
+                            ['condition' => 'rain', 'icon' => null],
+                            ['condition' => 'default', 'icon' => null],
+                        ])
+                        ->addActionLabel('Add Icon')
                         ->reorderable(true)
                         ->columnSpanFull(),
                 ]),
@@ -88,18 +102,18 @@ class WeatherSettingResource extends Resource
                     ->label('Classroom')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('city_name')
+                Tables\Columns\TextColumn::make('classroom.city.name')
                     ->label('City')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\IconColumn::make('api_key')
-                    ->label('API Configured')
-                    ->boolean()
-                    ->getStateUsing(fn ($record) => !empty($record->api_key))
-                    ->trueIcon('heroicon-o-check-circle')
-                    ->falseIcon('heroicon-o-x-circle')
-                    ->trueColor('success')
-                    ->falseColor('danger'),
+                Tables\Columns\TextColumn::make('icon_mapping')
+                    ->label('Icons Configured')
+                    ->getStateUsing(fn ($record) => count($record->icon_mapping ?? []))
+                    ->suffix(' icons'),
+                Tables\Columns\TextColumn::make('temperature_ranges')
+                    ->label('Temperature Ranges')
+                    ->getStateUsing(fn ($record) => count($record->temperature_ranges ?? []))
+                    ->suffix(' ranges'),
                 Tables\Columns\TextColumn::make('updated_at')
                     ->label('Last Updated')
                     ->dateTime()

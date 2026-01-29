@@ -10,15 +10,14 @@ class WeatherSetting extends Model
     /** @var array<int, string> */
     protected $fillable = [
         'classroom_id',
-        'api_provider',
-        'api_key',
-        'city_name',
         'icon_mapping',
+        'temperature_ranges',
     ];
 
     /** @var array<string, string> */
     protected $casts = [
         'icon_mapping' => 'array',
+        'temperature_ranges' => 'array',
     ];
 
     /**

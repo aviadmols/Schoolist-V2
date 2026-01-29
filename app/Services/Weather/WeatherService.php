@@ -3,6 +3,7 @@
 namespace App\Services\Weather;
 
 use App\Models\Classroom;
+use App\Models\WeatherGlobalSetting;
 use App\Models\WeatherSetting;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -22,21 +23,30 @@ class WeatherService
      */
     public function getWeatherForClassroom(Classroom $classroom): array
     {
-        $setting = $classroom->weatherSetting;
-
-        if (!$setting || !$setting->api_key || !$setting->city_name) {
+        $globalSetting = WeatherGlobalSetting::getInstance();
+        
+        if (!$globalSetting->api_key) {
             return $this->getDefaultWeather();
         }
+
+        // Get city name from classroom's city relationship
+        $cityName = $classroom->city?->name;
+        
+        if (!$cityName) {
+            return $this->getDefaultWeather();
+        }
+
+        $setting = $classroom->weatherSetting;
 
         $now = Carbon::now($classroom->timezone);
         $targetDate = $now->hour >= 16 ? $now->copy()->addDay() : $now->copy();
         $isToday = $targetDate->isToday();
 
-        $cacheKey = "weather.data.{$setting->id}." . ($isToday ? 'today' : 'tomorrow');
+        $cacheKey = "weather.data.{$classroom->id}." . ($isToday ? 'today' : 'tomorrow');
 
-        return Cache::remember($cacheKey, self::WEATHER_CACHE_TTL, function () use ($classroom, $setting, $targetDate) {
+        return Cache::remember($cacheKey, self::WEATHER_CACHE_TTL, function () use ($classroom, $globalSetting, $setting, $cityName, $targetDate) {
             try {
-                $weatherData = $this->fetchWeatherData($setting, $targetDate);
+                $weatherData = $this->fetchWeatherData($globalSetting, $cityName, $targetDate);
 
                 if (!$weatherData) {
                     return $this->getDefaultWeather();
@@ -44,7 +54,24 @@ class WeatherService
 
                 $temperature = $weatherData['temp'] ?? null;
                 $isRaining = ($weatherData['condition'] ?? '') === 'rain' || str_contains(strtolower($weatherData['description'] ?? ''), 'rain');
-                $icon = $this->getWeatherIcon($temperature, $isRaining, $setting->icon_mapping ?? []);
+                $iconMappingRaw = $setting?->icon_mapping ?? [];
+                $temperatureRanges = $setting?->temperature_ranges ?? [];
+                // Convert repeater array format to key-value mapping
+                $iconMapping = array_reduce(
+                    $iconMappingRaw,
+                    function (array $carry, $item): array {
+                        if (is_array($item) && isset($item['condition'], $item['icon'])) {
+                            $carry[$item['condition']] = $item['icon'];
+                        }
+                        return $carry;
+                    },
+                    []
+                );
+                $icon = $this->getWeatherIcon($temperature, $isRaining, $iconMapping, $temperatureRanges);
+                // Convert icon path to full URL if it's a file path
+                if ($icon && !str_starts_with($icon, 'http') && !str_starts_with($icon, '/') && !preg_match('/^[\x{1F300}-\x{1F9FF}]/u', $icon)) {
+                    $icon = asset('storage/' . $icon);
+                }
                 $recommendation = $this->getWeatherRecommendation($temperature ?? 20, $isRaining);
                 $text = $this->formatWeatherText($temperature, $weatherData['description'] ?? '', $recommendation);
 
@@ -94,14 +121,15 @@ class WeatherService
     /**
      * Fetch weather data from API.
      *
-     * @param WeatherSetting $setting
+     * @param WeatherGlobalSetting $globalSetting
+     * @param string $cityName
      * @param Carbon $targetDate
      * @return array{temp: float, condition: string, description: string}|null
      */
-    private function fetchWeatherData(WeatherSetting $setting, Carbon $targetDate): ?array
+    private function fetchWeatherData(WeatherGlobalSetting $globalSetting, string $cityName, Carbon $targetDate): ?array
     {
-        if ($setting->api_provider === 'openweathermap') {
-            return $this->fetchFromOpenWeatherMap($setting, $targetDate);
+        if ($globalSetting->api_provider === 'openweathermap') {
+            return $this->fetchFromOpenWeatherMap($globalSetting, $cityName, $targetDate);
         }
 
         return null;
@@ -110,14 +138,14 @@ class WeatherService
     /**
      * Fetch weather from OpenWeatherMap API.
      *
-     * @param WeatherSetting $setting
+     * @param WeatherGlobalSetting $globalSetting
+     * @param string $cityName
      * @param Carbon $targetDate
      * @return array{temp: float, condition: string, description: string}|null
      */
-    private function fetchFromOpenWeatherMap(WeatherSetting $setting, Carbon $targetDate): ?array
+    private function fetchFromOpenWeatherMap(WeatherGlobalSetting $globalSetting, string $cityName, Carbon $targetDate): ?array
     {
-        $cityName = $setting->city_name;
-        $apiKey = $setting->api_key;
+        $apiKey = $globalSetting->api_key;
 
         if (!$cityName || !$apiKey) {
             return null;
@@ -187,9 +215,10 @@ class WeatherService
      * @param float|null $temperature
      * @param bool $isRaining
      * @param array<string, string> $iconMapping
+     * @param array<string, string> $temperatureRanges
      * @return string
      */
-    private function getWeatherIcon(?float $temperature, bool $isRaining, array $iconMapping): string
+    private function getWeatherIcon(?float $temperature, bool $isRaining, array $iconMapping, array $temperatureRanges): string
     {
         if ($isRaining && isset($iconMapping['rain'])) {
             return $iconMapping['rain'];
@@ -199,6 +228,22 @@ class WeatherService
             return $iconMapping['default'] ?? '☀️';
         }
 
+        // If temperature ranges are configured, use them
+        if (!empty($temperatureRanges)) {
+            foreach ($temperatureRanges as $rangeConfig) {
+                if (is_array($rangeConfig) && isset($rangeConfig['range']) && isset($rangeConfig['condition_key'])) {
+                    if ($this->temperatureInRange($temperature, $rangeConfig['range'])) {
+                        $conditionKey = $rangeConfig['condition_key'];
+                        if (isset($iconMapping[$conditionKey])) {
+                            return $iconMapping[$conditionKey];
+                        }
+                    }
+                }
+            }
+            return $iconMapping['default'] ?? '☀️';
+        }
+
+        // Fallback to default ranges if no custom ranges are set
         if ($temperature >= 26) {
             return $iconMapping['hot'] ?? '☀️';
         } elseif ($temperature >= 20) {
@@ -210,6 +255,40 @@ class WeatherService
         } else {
             return $iconMapping['cold'] ?? '❄️';
         }
+    }
+
+    /**
+     * Check if temperature falls within a range.
+     *
+     * @param float $temperature
+     * @param string $range Format: "min-max" or "min+" or "-max"
+     * @return bool
+     */
+    private function temperatureInRange(float $temperature, string $range): bool
+    {
+        $range = trim($range);
+        
+        // Handle "min+" format (e.g., "25+")
+        if (str_ends_with($range, '+')) {
+            $min = (float) rtrim($range, '+');
+            return $temperature >= $min;
+        }
+        
+        // Handle "-max" format (e.g., "-10")
+        if (str_starts_with($range, '-')) {
+            $max = (float) ltrim($range, '-');
+            return $temperature <= $max;
+        }
+        
+        // Handle "min-max" format (e.g., "20-25")
+        if (str_contains($range, '-')) {
+            [$min, $max] = explode('-', $range, 2);
+            $min = (float) trim($min);
+            $max = (float) trim($max);
+            return $temperature >= $min && $temperature <= $max;
+        }
+        
+        return false;
     }
 
     /**

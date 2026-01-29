@@ -58,17 +58,30 @@ Route::post('/qlink/join', [QlinkController::class, 'join'])->name('qlink.join')
 Route::post('/qlink/auto', [QlinkController::class, 'autoLogin'])->name('qlink.auto');
 
 Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
-    $classroom->load(['city', 'school']);
+    // Eager load all relationships upfront to prevent N+1 queries
+    $classroom->load([
+        'city',
+        'school',
+        'children.contacts',
+        'users',
+        'weatherSetting',
+    ]);
+    
     $user = auth()->user();
+    
+    // User is already authenticated and has access (checked by middleware)
     $today = Carbon::now($classroom->timezone);
     $canManage = false;
 
     if ($user) {
+        // Use already loaded users relationship instead of querying again
         $canManage = $user->role === 'site_admin'
-            || $classroom->users()
-                ->where('users.id', $user->id)
-                ->wherePivotIn('role', ['owner', 'admin'])
-                ->exists();
+            || $classroom->users
+                ->where('id', $user->id)
+                ->filter(function (\App\Models\User $u) {
+                    return in_array($u->pivot->role ?? null, ['owner', 'admin']);
+                })
+                ->isNotEmpty();
     }
     
     // Advanced day logic: if hour >= 16:00, show tomorrow
@@ -144,6 +157,102 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
     $weekEnd = $today->copy()->endOfWeek();
 
     $pageData = Cache::remember("classroom.page.data.{$classroom->id}.{$selectedDay}", 300, function () use ($classroom, $selectedDay, $today, $timetableService, $announcementService, $weatherService, $greeting, $dayLabels, $dayNames, $formatDate, $formatTime, $mapHolidays, $weekStart, $weekEnd, $holidays) {
+        // Get all announcements once and filter by type
+        $allAnnouncements = $announcementService->getActiveFeed($classroom);
+        
+        // Process announcements (messages)
+        $announcements = $allAnnouncements
+            ->filter(fn (array $announcement) => ($announcement['type'] ?? '') === 'message')
+            ->filter(function (array $announcement) use ($today, $classroom): bool {
+                if (empty($announcement['occurs_on_date'])) return false;
+                $date = Carbon::parse($announcement['occurs_on_date'], $classroom->timezone);
+                return $date->isSameDay($today) || $date->greaterThan($today);
+            })
+            ->map(function (array $announcement) use ($formatDate, $formatTime): array {
+                return [
+                    'id' => $announcement['id'] ?? null,
+                    'type' => $announcement['type'] ?? 'message',
+                    'title' => $announcement['title'] ?? '',
+                    'content' => $announcement['content'] ?? '',
+                    'date' => $formatDate($announcement['occurs_on_date'] ?? null),
+                    'time' => $formatTime($announcement['occurs_at_time'] ?? null),
+                    'location' => $announcement['location'] ?? '',
+                    'is_done' => $announcement['is_done'] ?? false,
+                    'created_by' => $announcement['created_by'] ?? null,
+                ];
+            })
+            ->values()
+            ->all();
+        
+        // Process events
+        $events = $allAnnouncements
+            ->filter(fn (array $announcement) => ($announcement['type'] ?? '') === 'event')
+            ->map(function (array $announcement) use ($formatDate, $formatTime): array {
+                return [
+                    'id' => $announcement['id'] ?? null,
+                    'type' => $announcement['type'] ?? 'event',
+                    'title' => $announcement['title'] ?? '',
+                    'content' => $announcement['content'] ?? '',
+                    'date' => $formatDate($announcement['occurs_on_date'] ?? null),
+                    'time' => $formatTime($announcement['occurs_at_time'] ?? null),
+                    'location' => $announcement['location'] ?? '',
+                    'created_by' => $announcement['created_by'] ?? null,
+                ];
+            })
+            ->values()
+            ->all();
+
+        // Use already eager-loaded children relationship
+        $allChildren = $classroom->children
+            ->sortBy('name');
+        
+        // Process children
+        $children = $allChildren->map(function (\App\Models\Child $child): array {
+            $contacts = $child->contacts
+                ->sortBy('name')
+                ->map(function (\App\Models\ChildContact $contact): array {
+                    return [
+                        'name' => $contact->name,
+                        'phone' => $contact->phone,
+                        'relation' => $contact->relation,
+                    ];
+                })
+                ->values()
+                ->all();
+            
+            return [
+                'id' => $child->id,
+                'name' => $child->name,
+                'birth_date' => $child->birth_date?->format('d.m.Y'),
+                'contacts' => $contacts,
+            ];
+        })->values()->all();
+        
+        // Process upcoming birthdays from the same children collection
+        $upcomingBirthdays = $allChildren
+            ->whereNotNull('birth_date')
+            ->map(function (\App\Models\Child $child) use ($today): ?array {
+                $birthDate = $child->birth_date;
+                if (!$birthDate) return null;
+                $thisYearBirthday = Carbon::create($today->year, $birthDate->month, $birthDate->day, 0, 0, 0, $today->timezone);
+                $nextYearBirthday = Carbon::create($today->year + 1, $birthDate->month, $birthDate->day, 0, 0, 0, $today->timezone);
+                $weekEnd = $today->copy()->addWeek();
+                if ($thisYearBirthday->between($today, $weekEnd)) {
+                    return ['name' => $child->name, 'date' => $thisYearBirthday->format('d.m.Y'), 'days_until' => $today->diffInDays($thisYearBirthday, false)];
+                }
+                if ($nextYearBirthday->between($today, $weekEnd)) {
+                    return ['name' => $child->name, 'date' => $nextYearBirthday->format('d.m.Y'), 'days_until' => $today->diffInDays($nextYearBirthday, false)];
+                }
+                return null;
+            })
+            ->filter()
+            ->sortBy('days_until')
+            ->values()
+            ->all();
+
+        // Get weather data once
+        $weatherData = $weatherService->getWeatherForClassroom($classroom);
+
         return [
             'school_year' => ($today->month >= 9 ? $today->year : $today->year - 1).'-'.(($today->month >= 9 ? $today->year : $today->year - 1) + 1),
             'classroom' => [
@@ -159,46 +268,10 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
             'day_labels' => $dayLabels,
             'day_names' => $dayNames,
             'timetable' => $timetableService->getWeeklyTimetable($classroom),
-            'announcements' => $announcementService->getActiveFeed($classroom)
-                ->filter(fn (array $announcement) => ($announcement['type'] ?? '') === 'message')
-                ->filter(function (array $announcement) use ($today, $classroom): bool {
-                    if (empty($announcement['occurs_on_date'])) return false;
-                    $date = Carbon::parse($announcement['occurs_on_date'], $classroom->timezone);
-                    return $date->isSameDay($today) || $date->greaterThan($today);
-                })
-                ->map(function (array $announcement) use ($formatDate, $formatTime): array {
-                    return [
-                        'id' => $announcement['id'] ?? null,
-                        'type' => $announcement['type'] ?? 'message',
-                        'title' => $announcement['title'] ?? '',
-                        'content' => $announcement['content'] ?? '',
-                        'date' => $formatDate($announcement['occurs_on_date'] ?? null),
-                        'time' => $formatTime($announcement['occurs_at_time'] ?? null),
-                        'location' => $announcement['location'] ?? '',
-                        'is_done' => $announcement['is_done'] ?? false,
-                        'created_by' => $announcement['created_by'] ?? null,
-                    ];
-                })
-                ->values()
-                ->all(),
-            'events' => $announcementService->getActiveFeed($classroom)
-                ->filter(fn (array $announcement) => ($announcement['type'] ?? '') === 'event')
-                ->map(function (array $announcement) use ($formatDate, $formatTime): array {
-                    return [
-                        'id' => $announcement['id'] ?? null,
-                        'type' => $announcement['type'] ?? 'event',
-                        'title' => $announcement['title'] ?? '',
-                        'content' => $announcement['content'] ?? '',
-                        'date' => $formatDate($announcement['occurs_on_date'] ?? null),
-                        'time' => $formatTime($announcement['occurs_at_time'] ?? null),
-                        'location' => $announcement['location'] ?? '',
-                        'created_by' => $announcement['created_by'] ?? null,
-                    ];
-                })
-                ->values()
-                ->all(),
-            'events_today' => array_merge($mapHolidays($today, $today), []),
-            'events_week' => array_merge($mapHolidays($weekStart, $weekEnd), []),
+            'announcements' => $announcements,
+            'events' => $events,
+            'events_today' => $mapHolidays($today, $today),
+            'events_week' => $mapHolidays($weekStart, $weekEnd),
             'links' => \App\Models\ClassLink::where('classroom_id', $classroom->id)
                 ->orderBy('sort_order', 'asc')
                 ->get()
@@ -248,60 +321,16 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
                 })
                 ->values()
                 ->all(),
-            'children' => $classroom->children()
-                ->with('contacts')
-                ->orderBy('name', 'asc')
-                ->get()
-                ->map(function (\App\Models\Child $child): array {
-                    $contacts = $child->contacts
-                        ->sortBy('name')
-                        ->map(function (\App\Models\ChildContact $contact): array {
-                            return [
-                                'name' => $contact->name,
-                                'phone' => $contact->phone,
-                                'relation' => $contact->relation,
-                            ];
-                        })
-                        ->values()
-                        ->all();
-                    
-                    return [
-                        'id' => $child->id,
-                        'name' => $child->name,
-                        'birth_date' => $child->birth_date?->format('d.m.Y'),
-                        'contacts' => $contacts,
-                    ];
-                })
-                ->values()
-                ->all(),
-            'weather' => $weatherService->getWeatherForClassroom($classroom),
-            'weather_text' => $weatherService->getWeatherForClassroom($classroom)['text'] ?? '16-20° - מזג אוויר נוח.',
+            'children' => $children,
+            'weather' => $weatherData,
             'greeting' => $greeting,
-            'upcoming_birthdays' => $classroom->children()
-                ->whereNotNull('birth_date')
-                ->get()
-                ->map(function (\App\Models\Child $child) use ($today): ?array {
-                    $birthDate = $child->birth_date;
-                    if (!$birthDate) return null;
-                    $thisYearBirthday = Carbon::create($today->year, $birthDate->month, $birthDate->day, 0, 0, 0, $today->timezone);
-                    $nextYearBirthday = Carbon::create($today->year + 1, $birthDate->month, $birthDate->day, 0, 0, 0, $today->timezone);
-                    $weekEnd = $today->copy()->addWeek();
-                    if ($thisYearBirthday->between($today, $weekEnd)) {
-                        return ['name' => $child->name, 'date' => $thisYearBirthday->format('d.m.Y'), 'days_until' => $today->diffInDays($thisYearBirthday, false)];
-                    }
-                    if ($nextYearBirthday->between($today, $weekEnd)) {
-                        return ['name' => $child->name, 'date' => $nextYearBirthday->format('d.m.Y'), 'days_until' => $today->diffInDays($nextYearBirthday, false)];
-                    }
-                    return null;
+            'upcoming_birthdays' => $upcomingBirthdays,
+            'classroom_admins' => $classroom->users
+                ->filter(function (\App\Models\User $user) use ($classroom): bool {
+                    $isAdminByRole = in_array($user->pivot->role ?? null, ['owner', 'admin']);
+                    $isAdminById = in_array($user->id, $classroom->classroom_admins ?? []);
+                    return $isAdminByRole || $isAdminById;
                 })
-                ->filter()
-                ->sortBy('days_until')
-                ->values()
-                ->all(),
-            'classroom_admins' => $classroom->users()
-                ->wherePivotIn('role', ['owner', 'admin'])
-                ->orWhereIn('users.id', $classroom->classroom_admins ?? [])
-                ->get()
                 ->map(function (\App\Models\User $admin): array {
                     return ['id' => $admin->id, 'name' => $admin->name, 'phone' => $admin->phone];
                 })
@@ -333,7 +362,7 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
     }
 
     return \Inertia\Inertia::render('Dashboard', $pageData);
-})->name('classroom.show');
+})->middleware(['auth', 'classroom.access'])->name('classroom.show');
 
 Route::post('/class/{classroom}/ai-analyze', [\App\Http\Controllers\Classroom\FrontendAiAddController::class, 'analyze'])->name('classroom.ai.analyze');
 Route::post('/class/{classroom}/ai-store', [\App\Http\Controllers\Classroom\FrontendAiAddController::class, 'store'])->name('classroom.ai.store');
@@ -348,8 +377,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [\App\Http\Controllers\Classroom\ClassroomController::class, 'index'])->name('classroom.index');
         Route::get('/create', [\App\Http\Controllers\Classroom\ClassroomController::class, 'create'])->name('classroom.create');
         Route::post('/', [\App\Http\Controllers\Classroom\ClassroomController::class, 'store'])->name('classroom.store');
-        Route::get('/join', [\App\Http\Controllers\Classroom\ClassroomController::class, 'showJoin'])->name('classroom.join.view');
-        Route::post('/join', [\App\Http\Controllers\Classroom\ClassroomController::class, 'join'])->name('classroom.join');
+        Route::post('/join', \App\Http\Controllers\Classroom\JoinClassroomController::class)->name('classroom.join');
         Route::post('/{classroom}/switch', [\App\Http\Controllers\Classroom\ClassroomController::class, 'switch'])->name('classroom.switch');
         
         // Link Claiming
