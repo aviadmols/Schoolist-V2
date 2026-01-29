@@ -65,6 +65,8 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
         'children.contacts',
         'users',
         'weatherSetting',
+        'links',
+        'importantContacts',
     ]);
     
     $user = auth()->user();
@@ -272,9 +274,8 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
             'events' => $events,
             'events_today' => $mapHolidays($today, $today),
             'events_week' => $mapHolidays($weekStart, $weekEnd),
-            'links' => \App\Models\ClassLink::where('classroom_id', $classroom->id)
-                ->orderBy('sort_order', 'asc')
-                ->get()
+            'links' => $classroom->links
+                ->sortBy('sort_order')
                 ->map(function (\App\Models\ClassLink $link): array {
                     $fileUrl = $link->file_path ? Storage::disk('public')->url($link->file_path) : null;
                     $linkUrl = $link->url ?: $fileUrl;
@@ -308,9 +309,8 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
                 })
                 ->values()
                 ->all(),
-            'important_contacts' => \App\Models\ImportantContact::where('classroom_id', $classroom->id)
-                ->orderBy('first_name', 'asc')
-                ->get()
+            'important_contacts' => $classroom->importantContacts
+                ->sortBy('first_name')
                 ->map(function (\App\Models\ImportantContact $contact): array {
                     return [
                         'name' => trim($contact->first_name.' '.$contact->last_name),
