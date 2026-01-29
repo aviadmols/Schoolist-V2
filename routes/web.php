@@ -486,6 +486,9 @@ Route::middleware('auth')->group(function () {
 
     // Scoped by classroom.context middleware
     Route::middleware('classroom.context')->group(function () {
+        Route::post('/ai-analyze', [\App\Http\Controllers\Classroom\FrontendAiAddController::class, 'analyze'])->name('classroom.ai.analyze');
+        Route::post('/ai-store', [\App\Http\Controllers\Classroom\FrontendAiAddController::class, 'store'])->name('classroom.ai.store');
+
         Route::get('/announcements', [\App\Http\Controllers\Classroom\AnnouncementController::class, 'index'])->name('announcements.index');
         Route::post('/announcements', [\App\Http\Controllers\Classroom\AnnouncementController::class, 'store'])->name('announcements.store');
         Route::post('/announcements/{announcement}/done', [\App\Http\Controllers\Classroom\AnnouncementController::class, 'toggleDone'])->name('announcements.done');

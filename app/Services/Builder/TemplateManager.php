@@ -289,6 +289,171 @@ class TemplateManager
   .sb-popup-card { width: 100%; max-width: 420px; background: #ffffff; border-radius: 24px 24px 0 0; padding: 20px; transform: translateY(40px); transition: transform 240ms ease; }
   .sb-popup.is-open .sb-popup-card { transform: translateY(0); }
   .logo-image { height: 20px; width: auto; display: block; }
+
+  /* Quick Add Button */
+  .fixed-add-btn {
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--blue-primary);
+    color: white;
+    border: none;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 30;
+    transition: transform 0.2s;
+  }
+  .fixed-add-btn:active { transform: scale(0.9); }
+
+  /* Quick Add Card */
+  .quick-add-card {
+    border-radius: 24px !important;
+    padding: 0 !important;
+    overflow: hidden;
+    max-width: 450px !important;
+  }
+  .quick-add-header {
+    padding: 20px;
+    position: relative;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .quick-add-header .close-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: #94a3b8;
+    cursor: pointer;
+  }
+  .quick-add-title {
+    font-size: 20px;
+    font-weight: 800;
+    text-align: center;
+    color: #0f172a;
+  }
+  .quick-add-title .subtitle {
+    font-weight: 400;
+    color: #64748b;
+    font-size: 16px;
+  }
+  .quick-add-body { padding: 20px; }
+  .input-container {
+    background: #f8fafc;
+    border-radius: 16px;
+    padding: 16px;
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+  }
+  #quick-add-text {
+    width: 100%;
+    border: none;
+    background: transparent;
+    resize: none;
+    font-family: inherit;
+    font-size: 16px;
+    color: #1e293b;
+    flex: 1;
+    min-height: 150px;
+    outline: none;
+  }
+  .file-preview-area {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #e2e8f0;
+  }
+  .file-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #64748b;
+  }
+  .remove-file-btn {
+    margin-right: auto;
+    background: none;
+    border: none;
+    color: #ef4444;
+    font-size: 18px;
+    cursor: pointer;
+  }
+  .quick-add-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+  }
+  .add-file-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    font-weight: 600;
+    color: #475569;
+    cursor: pointer;
+  }
+  .visibility-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+  }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #cbd5e1;
+    transition: .4s;
+    border-radius: 24px;
+  }
+  .slider:before {
+    position: absolute;
+    content: "";
+    height: 18px; width: 18px;
+    left: 3px; bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+  }
+  input:checked + .slider { background-color: var(--blue-primary); }
+  input:checked + .slider:before { transform: translateX(20px); }
+  .toggle-label { font-size: 14px; font-weight: 600; color: #475569; }
+  .private-only-note { font-size: 13px; color: #94a3b8; font-style: italic; }
+  .quick-add-footer { padding: 0 20px 20px 20px; }
+  .submit-btn {
+    width: 100%;
+    background: var(--blue-primary);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 18px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 </style>
 
 <div class="mobile-wrapper" dir="rtl">
@@ -563,9 +728,73 @@ class TemplateManager
       שיתוף הדף
     </div>
   </footer>
+
+  <button id="ai-quick-add-trigger" class="fixed-add-btn" title="הוספה מהירה">
+    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+  </button>
 </div>
 
 <div class="sb-popup-backdrop" data-popup-backdrop></div>
+
+<div id="popup-quick-add" class="sb-popup" data-popup>
+  <div class="sb-popup-card quick-add-card">
+    <div class="quick-add-header">
+      <button class="close-btn" data-popup-close>&times;</button>
+      <div class="quick-add-title">הוספה מהירה <span class="subtitle">קדימה!</span></div>
+    </div>
+    <div class="quick-add-body">
+      <div class="input-container">
+        <textarea id="quick-add-text" placeholder="יש שיעורים באנגלית אני מצרפת קובץ של המילים להכתבה..."></textarea>
+        <div id="quick-add-file-preview" class="file-preview-area" style="display: none;">
+          <div class="file-info">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+            <span id="file-name"></span>
+            <button id="remove-file" class="remove-file-btn">&times;</button>
+          </div>
+        </div>
+      </div>
+      
+      <div class="quick-add-actions">
+        <label class="add-file-btn">
+          <input type="file" id="quick-add-file" accept="image/*" hidden>
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+          הוסף קובץ
+        </label>
+
+        @if($page['can_manage'] || ($page['classroom']['allow_member_posting'] ?? false))
+          <div class="visibility-option">
+            <label class="toggle-switch">
+              <input type="checkbox" id="quick-add-is-public" checked>
+              <span class="slider"></span>
+            </label>
+            <span class="toggle-label">פרסם לכולם</span>
+          </div>
+        @else
+          <div class="private-only-note">הפרסום יהיה גלוי רק לך</div>
+        @endif
+      </div>
+    </div>
+    <div class="quick-add-footer">
+      <button id="quick-add-submit" class="submit-btn">
+        המשך
+        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="margin-right: 8px; transform: rotate(180deg);"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="popup-ai-confirm" class="sb-popup" data-popup>
+  <div class="sb-popup-card">
+    <div class="sb-modal-title">אישור פרטים</div>
+    <div id="ai-suggestion-content" class="sb-modal-body">
+      <!-- Content populated by JS -->
+    </div>
+    <div class="sb-modal-actions">
+      <button type="button" class="sb-button is-ghost" data-popup-close>ביטול</button>
+      <button type="button" id="ai-confirm-save" class="sb-button">אשר ושמור</button>
+    </div>
+  </div>
+</div>
 
 [[popup:invite]]
 [[popup:homework]]
@@ -600,6 +829,147 @@ class TemplateManager
     }
 
     function setupClassroomPageFeatures() {
+    // Quick Add Logic
+    const quickAddTrigger = document.getElementById('ai-quick-add-trigger');
+    const quickAddModal = document.getElementById('popup-quick-add');
+    const quickAddSubmit = document.getElementById('quick-add-submit');
+    const quickAddText = document.getElementById('quick-add-text');
+    const quickAddFile = document.getElementById('quick-add-file');
+    const quickAddFilePreview = document.getElementById('quick-add-file-preview');
+    const fileNameDisplay = document.getElementById('file-name');
+    const removeFileBtn = document.getElementById('remove-file');
+    const isPublicCheckbox = document.getElementById('quick-add-is-public');
+    
+    const aiConfirmModal = document.getElementById('popup-ai-confirm');
+    const aiSuggestionContent = document.getElementById('ai-suggestion-content');
+    const aiConfirmSave = document.getElementById('ai-confirm-save');
+    
+    let currentSuggestion = null;
+
+    if (quickAddTrigger) {
+      quickAddTrigger.addEventListener('click', () => openPopup('popup-quick-add'));
+    }
+
+    if (quickAddFile) {
+      quickAddFile.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          fileNameDisplay.textContent = file.name;
+          quickAddFilePreview.style.display = 'block';
+        }
+      });
+    }
+
+    if (removeFileBtn) {
+      removeFileBtn.addEventListener('click', () => {
+        quickAddFile.value = '';
+        quickAddFilePreview.style.display = 'none';
+      });
+    }
+
+    if (quickAddSubmit) {
+      quickAddSubmit.addEventListener('click', async () => {
+        const text = quickAddText.value.trim();
+        const file = quickAddFile.files[0];
+
+        if (!text && !file) {
+          alert('נא להזין טקסט או לצרף תמונה');
+          return;
+        }
+
+        quickAddSubmit.disabled = true;
+        quickAddSubmit.textContent = 'מנתח...';
+
+        const formData = new FormData();
+        formData.append('content_text', text);
+        if (file) formData.append('content_file', file);
+        
+        try {
+          const response = await fetch(`/class/{!! $page['classroom']['id'] !!}/ai-analyze`, {
+            method: 'POST',
+            headers: {
+              'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            },
+            body: formData
+          });
+
+          const data = await response.json();
+          if (data.ok) {
+            currentSuggestion = data.suggestion;
+            renderAiSuggestion(data.suggestion);
+            closePopups();
+            openPopup('popup-ai-confirm');
+          } else {
+            alert(data.error || 'ניתוח ה-AI נכשל');
+          }
+        } catch (err) {
+          console.error(err);
+          alert('שגיאה בתקשורת עם השרת');
+        } finally {
+          quickAddSubmit.disabled = false;
+          quickAddSubmit.textContent = 'המשך';
+        }
+      });
+    }
+
+    function renderAiSuggestion(suggestion) {
+      const typeLabels = { announcement: 'הודעה', event: 'אירוע', homework: 'שיעורי בית', contact: 'איש קשר', contact_page: 'דף קשר' };
+      const data = suggestion.extracted_data;
+      let html = `<div class="suggestion-preview">
+        <div style="font-weight: bold; color: var(--blue-primary); margin-bottom: 10px;">סוג זוהה: ${typeLabels[suggestion.type] || suggestion.type}</div>
+        <div style="background: #f1f5f9; padding: 12px; border-radius: 8px; font-size: 14px;">`;
+      
+      if (suggestion.type === 'announcement' || suggestion.type === 'event' || suggestion.type === 'homework') {
+        html += `<div><strong>כותרת:</strong> ${data.title || data.name || ''}</div>`;
+        if (data.content || data.description) html += `<div style="margin-top:4px;"><strong>תוכן:</strong> ${data.content || data.description}</div>`;
+        if (data.date || data.due_date) html += `<div style="margin-top:4px;"><strong>תאריך:</strong> ${data.date || data.due_date}</div>`;
+      } else if (suggestion.type === 'contact') {
+        html += `<div><strong>שם:</strong> ${data.name || ''}</div>`;
+        if (data.role) html += `<div><strong>תפקיד:</strong> ${data.role}</div>`;
+        if (data.phone) html += `<div><strong>טלפון:</strong> ${data.phone}</div>`;
+      }
+
+      html += `</div></div>`;
+      aiSuggestionContent.innerHTML = html;
+    }
+
+    if (aiConfirmSave) {
+      aiConfirmSave.addEventListener('click', async () => {
+        if (!currentSuggestion) return;
+
+        aiConfirmSave.disabled = true;
+        aiConfirmSave.textContent = 'שומר...';
+
+        try {
+          const response = await fetch(`/class/{!! $page['classroom']['id'] !!}/ai-store`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            },
+            body: JSON.stringify({
+              suggestion: currentSuggestion,
+              is_public: isPublicCheckbox ? isPublicCheckbox.checked : false
+            })
+          });
+
+          const data = await response.json();
+          if (data.ok) {
+            alert(data.message);
+            location.reload();
+          } else {
+            alert(data.error || 'שמירה נכשלה');
+          }
+        } catch (err) {
+          console.error(err);
+          alert('שגיאה בשמירת הנתונים');
+        } finally {
+          aiConfirmSave.disabled = false;
+          aiConfirmSave.textContent = 'אשר ושמור';
+        }
+      });
+    }
+
     const dayNames = Array.from(document.querySelectorAll('.day-tab'))
       .map((tab) => (tab && tab.textContent) ? tab.textContent.trim() : '');
     const timetable = {!! json_encode($page['timetable'] ?? []) !!};
