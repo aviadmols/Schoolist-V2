@@ -88,7 +88,7 @@
             <h3 class="text-lg font-semibold mb-2 text-blue-800 dark:text-blue-200">💡 Tips</h3>
             <ul class="list-disc list-inside space-y-1 text-gray-700 dark:text-gray-300">
                 <li>Always use <code class="bg-gray-200 dark:bg-gray-700 px-1 rounded">??</code> operator for optional values: <code class="bg-gray-200 dark:bg-gray-700 px-1 rounded">$page['weather']['text'] ?? 'No weather data'</code></li>
-                <li>Use <code class="bg-gray-200 dark:bg-gray-700 px-1 rounded">@if (!empty(...))</code> to check if arrays have data before looping</li>
+                <li>Use <code class="bg-gray-200 dark:bg-gray-700 px-1 rounded">{{ '@' }}if (!empty(...))</code> to check if arrays have data before looping</li>
                 <li>Popup tokens like <code class="bg-gray-200 dark:bg-gray-700 px-1 rounded">[[popup:whatsapp]]</code> will be automatically replaced with the popup HTML</li>
                 <li>Data attributes enable JavaScript interactions - use them for dynamic popups and interactions</li>
             </ul>
