@@ -902,8 +902,8 @@ class TemplateManager
 
             try {
               const formData = new FormData();
-              if (text) formData.append('text', text);
-              if (selectedFile) formData.append('file', selectedFile);
+              if (text) formData.append('content_text', text);
+              if (selectedFile) formData.append('content_file', selectedFile);
 
               const response = await fetch(`/class/${classroomId}/ai-analyze`, {
                 method: 'POST',
@@ -915,22 +915,37 @@ class TemplateManager
 
               if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || 'שגיאה בניתוח');
+                throw new Error(errorData.error || errorData.message || 'שגיאה בניתוח');
               }
 
-              const data = await response.json();
-              aiSuggestionData = data;
+              const result = await response.json();
+              
+              // Check if response is ok
+              if (!result.ok || !result.suggestion) {
+                throw new Error(result.error || 'לא התקבלה הצעה מה-AI');
+              }
+
+              const suggestion = result.suggestion;
+              aiSuggestionData = suggestion;
               
               // Show AI suggestion popup
               if (aiSuggestionContent) {
-                const typeLabel = data.type === 'event' ? 'אירוע' : data.type === 'homework' ? 'שיעורי בית' : 'הודעה';
+                const extractedData = suggestion.extracted_data || {};
+                const type = suggestion.type || 'announcement';
+                const typeLabel = type === 'event' ? 'אירוע' : type === 'homework' ? 'שיעורי בית' : 'הודעה';
+                
+                // Handle multiple items or single item
+                const items = extractedData.items || [extractedData];
+                const firstItem = items[0] || {};
+                
                 aiSuggestionContent.innerHTML = `
                   <div style="margin-bottom: 16px;">
                     <strong>סוג:</strong> ${typeLabel}<br>
-                    <strong>כותרת:</strong> ${data.title || ''}<br>
-                    <strong>תוכן:</strong> ${data.content || ''}<br>
-                    ${data.date ? `<strong>תאריך:</strong> ${data.date}<br>` : ''}
-                    ${data.time ? `<strong>שעה:</strong> ${data.time}<br>` : ''}
+                    <strong>כותרת:</strong> ${firstItem.title || firstItem.name || ''}<br>
+                    <strong>תוכן:</strong> ${firstItem.content || firstItem.description || ''}<br>
+                    ${firstItem.date || firstItem.due_date ? `<strong>תאריך:</strong> ${firstItem.date || firstItem.due_date}<br>` : ''}
+                    ${firstItem.time ? `<strong>שעה:</strong> ${firstItem.time}<br>` : ''}
+                    ${firstItem.location ? `<strong>מיקום:</strong> ${firstItem.location}<br>` : ''}
                   </div>
                 `;
               }
@@ -982,7 +997,7 @@ class TemplateManager
                   'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
                 },
                 body: JSON.stringify({
-                  ...aiSuggestionData,
+                  suggestion: aiSuggestionData,
                   is_public: isPublic,
                 }),
               });
@@ -1198,30 +1213,30 @@ class TemplateManager
         const itemPopupTriggers = document.querySelectorAll('[data-item-popup]');
         if (itemPopupTriggers && itemPopupTriggers.length > 0) {
           itemPopupTriggers.forEach((trigger) => {
-          if (!trigger || typeof trigger.addEventListener !== 'function') return;
-          try {
-            trigger.addEventListener('click', (event) => {
-              try {
-                event.preventDefault();
-                event.stopPropagation();
-                if (!trigger) return;
-                // Safe dataset access
-                let dataset = {};
+            if (!trigger || typeof trigger.addEventListener !== 'function') return;
+            try {
+              trigger.addEventListener('click', (event) => {
                 try {
-                  if (trigger && trigger.dataset) {
-                    dataset = trigger.dataset;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (!trigger) return;
+                  // Safe dataset access
+                  let dataset = {};
+                  try {
+                    if (trigger && trigger.dataset) {
+                      dataset = trigger.dataset;
+                    }
+                  } catch (e) {
+                    // Ignore
                   }
-                } catch (e) {
+                  const targetId = trigger.getAttribute('data-item-popup');
+                  if (!targetId) return;
+                  setContentPopup(dataset);
+                  openPopup(targetId);
+                } catch (err) {
                   // Ignore
                 }
-                const targetId = trigger.getAttribute('data-item-popup');
-                if (!targetId) return;
-                setContentPopup(dataset);
-                openPopup(targetId);
-              } catch (err) {
-                // Ignore
-              }
-            });
+              });
             } catch (err) {
               console.error('Error adding event listener to trigger:', err);
             }
@@ -1233,8 +1248,8 @@ class TemplateManager
 
       try {
         const popupTargetTriggers = document.querySelectorAll('[data-popup-target]');
-      if (popupTargetTriggers && popupTargetTriggers.length > 0) {
-        popupTargetTriggers.forEach((trigger) => {
+        if (popupTargetTriggers && popupTargetTriggers.length > 0) {
+          popupTargetTriggers.forEach((trigger) => {
           if (!trigger || typeof trigger.addEventListener !== 'function') return;
           try {
             trigger.addEventListener('click', (event) => {
