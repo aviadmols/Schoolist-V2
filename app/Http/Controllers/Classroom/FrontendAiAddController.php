@@ -311,62 +311,191 @@ class FrontendAiAddController extends Controller
 
     private function createAnnouncements($classroom, $type, $data, $isPublic)
     {
+        $requestId = uniqid('frontend_create_announcements_', true);
         $announcementType = $type === 'announcement' ? 'message' : $type;
-        $items = isset($data['items']) ? $data['items'] : [$data];
+        
+        // Handle both 'items' array and single item
+        $items = [];
+        if (isset($data['items']) && is_array($data['items'])) {
+            $items = $data['items'];
+        } elseif (!empty($data)) {
+            $items = [$data];
+        }
+        
+        Log::info("[Frontend Create Announcements] Starting", [
+            'request_id' => $requestId,
+            'type' => $type,
+            'announcement_type' => $announcementType,
+            'items_count' => count($items),
+            'data' => $data,
+        ]);
 
-        foreach ($items as $item) {
-            $title = $item['title'] ?? $item['name'] ?? 'ללא כותרת';
-            $content = $item['content'] ?? $item['description'] ?? '';
-            
-            Announcement::create([
-                'classroom_id' => $classroom->id,
-                'user_id' => auth()->id(),
-                'type' => $announcementType,
-                'title' => mb_substr($title, 0, self::ANNOUNCEMENT_TITLE_MAX_LENGTH),
-                'content' => $content,
-                'occurs_on_date' => $this->parseDate($item['date'] ?? $item['due_date'] ?? null),
-                'occurs_at_time' => $item['time'] ?? null,
-                'location' => $item['location'] ?? null,
-                'is_public' => $isPublic, // We might need to add this column to announcements table if it doesn't exist
+        if (empty($items)) {
+            Log::error("[Frontend Create Announcements] No items to create", [
+                'request_id' => $requestId,
+                'data' => $data,
             ]);
+            throw new \Exception('אין פריטים ליצירה');
+        }
+
+        foreach ($items as $index => $item) {
+            try {
+                $title = $item['title'] ?? $item['name'] ?? 'ללא כותרת';
+                $content = $item['content'] ?? $item['description'] ?? '';
+                $dateValue = $item['date'] ?? $item['due_date'] ?? null;
+                $parsedDate = $this->parseDate($dateValue);
+                
+                Log::info("[Frontend Create Announcements] Creating item", [
+                    'request_id' => $requestId,
+                    'index' => $index,
+                    'title' => $title,
+                    'has_content' => !empty($content),
+                    'date_value' => $dateValue,
+                    'parsed_date' => $parsedDate,
+                    'time' => $item['time'] ?? null,
+                    'location' => $item['location'] ?? null,
+                ]);
+                
+                $announcement = Announcement::create([
+                    'classroom_id' => $classroom->id,
+                    'user_id' => auth()->id(),
+                    'type' => $announcementType,
+                    'title' => mb_substr($title, 0, self::ANNOUNCEMENT_TITLE_MAX_LENGTH),
+                    'content' => $content,
+                    'occurs_on_date' => $parsedDate,
+                    'occurs_at_time' => $item['time'] ?? null,
+                    'location' => $item['location'] ?? null,
+                ]);
+                
+                Log::info("[Frontend Create Announcements] Item created", [
+                    'request_id' => $requestId,
+                    'index' => $index,
+                    'announcement_id' => $announcement->id,
+                ]);
+            } catch (\Exception $e) {
+                Log::error("[Frontend Create Announcements] Failed to create item", [
+                    'request_id' => $requestId,
+                    'index' => $index,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                    'item' => $item,
+                ]);
+                throw $e;
+            }
         }
     }
 
     private function createContacts($classroom, $data)
     {
-        $contacts = isset($data['contacts']) ? $data['contacts'] : [$data];
-        foreach ($contacts as $c) {
-            $name = $c['name'] ?? '';
-            $parts = explode(' ', trim($name));
-            $firstName = array_shift($parts);
-            $lastName = implode(' ', $parts);
+        $requestId = uniqid('frontend_create_contacts_', true);
+        
+        // Handle both 'contacts' array and single contact
+        $contacts = [];
+        if (isset($data['contacts']) && is_array($data['contacts'])) {
+            $contacts = $data['contacts'];
+        } elseif (!empty($data)) {
+            $contacts = [$data];
+        }
+        
+        Log::info("[Frontend Create Contacts] Starting", [
+            'request_id' => $requestId,
+            'contacts_count' => count($contacts),
+            'data' => $data,
+        ]);
 
-            ImportantContact::create([
-                'classroom_id' => $classroom->id,
-                'first_name' => $firstName,
-                'last_name' => $lastName,
-                'role' => $c['role'] ?? '',
-                'phone' => $c['phone'] ?? '',
-                'email' => $c['email'] ?? '',
+        if (empty($contacts)) {
+            Log::error("[Frontend Create Contacts] No contacts to create", [
+                'request_id' => $requestId,
+                'data' => $data,
             ]);
+            throw new \Exception('אין אנשי קשר ליצירה');
+        }
+
+        foreach ($contacts as $index => $c) {
+            try {
+                $name = $c['name'] ?? '';
+                $parts = explode(' ', trim($name));
+                $firstName = array_shift($parts) ?: '';
+                $lastName = implode(' ', $parts);
+
+                Log::info("[Frontend Create Contacts] Creating contact", [
+                    'request_id' => $requestId,
+                    'index' => $index,
+                    'name' => $name,
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                ]);
+
+                ImportantContact::create([
+                    'classroom_id' => $classroom->id,
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'role' => $c['role'] ?? '',
+                    'phone' => $c['phone'] ?? '',
+                    'email' => $c['email'] ?? '',
+                ]);
+            } catch (\Exception $e) {
+                Log::error("[Frontend Create Contacts] Failed to create contact", [
+                    'request_id' => $requestId,
+                    'index' => $index,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                    'contact' => $c,
+                ]);
+                throw $e;
+            }
         }
     }
 
     private function createChildContactPage($classroom, $data)
     {
-        $child = Child::create([
-            'classroom_id' => $classroom->id,
-            'name' => $data['child_name'] ?? '',
-            'birth_date' => $this->parseDate($data['child_birth_date'] ?? null),
+        $requestId = uniqid('frontend_create_child_', true);
+        
+        Log::info("[Frontend Create Child Contact Page] Starting", [
+            'request_id' => $requestId,
+            'child_name' => $data['child_name'] ?? null,
+            'child_birth_date' => $data['child_birth_date'] ?? null,
+            'parent1_name' => $data['parent1_name'] ?? null,
+            'parent2_name' => $data['parent2_name'] ?? null,
         ]);
 
-        if (!empty($data['parent1_name'])) {
-            ChildContact::create([
-                'child_id' => $child->id,
-                'name' => $data['parent1_name'],
-                'relation' => $data['parent1_role'] ?? 'other',
-                'phone' => $data['parent1_phone'] ?? '',
+        try {
+            $child = Child::create([
+                'classroom_id' => $classroom->id,
+                'name' => $data['child_name'] ?? '',
+                'birth_date' => $this->parseDate($data['child_birth_date'] ?? null),
             ]);
+
+            Log::info("[Frontend Create Child Contact Page] Child created", [
+                'request_id' => $requestId,
+                'child_id' => $child->id,
+            ]);
+
+            if (!empty($data['parent1_name'])) {
+                ChildContact::create([
+                    'child_id' => $child->id,
+                    'name' => $data['parent1_name'],
+                    'relation' => $data['parent1_role'] ?? 'other',
+                    'phone' => $data['parent1_phone'] ?? '',
+                ]);
+            }
+            
+            if (!empty($data['parent2_name'])) {
+                ChildContact::create([
+                    'child_id' => $child->id,
+                    'name' => $data['parent2_name'],
+                    'relation' => $data['parent2_role'] ?? 'other',
+                    'phone' => $data['parent2_phone'] ?? '',
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::error("[Frontend Create Child Contact Page] Failed", [
+                'request_id' => $requestId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'data' => $data,
+            ]);
+            throw $e;
         }
     }
 
