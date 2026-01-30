@@ -75,7 +75,11 @@ class FrontendAiAddController extends Controller
 
         if ($text === '' && !$file) {
             Log::warning("[AI Analyze] Empty input", ['request_id' => $requestId]);
-            return response()->json(['ok' => false, 'error' => 'נא להזין טקסט או לצרף תמונה'], 422);
+            return response()->json([
+                'ok' => false, 
+                'error' => 'נא להזין טקסט או לצרף תמונה',
+                'details' => 'לא התקבל תוכן לניתוח - יש להזין טקסט או לצרף קובץ תמונה'
+            ], 422);
         }
 
         $setting = AiSetting::where('provider', self::AI_PROVIDER)
@@ -83,14 +87,28 @@ class FrontendAiAddController extends Controller
             ->first();
 
         if (!$setting || !$setting->token || !$setting->content_analyzer_model || !$setting->content_analyzer_prompt) {
+            $missingParts = [];
+            if (!$setting) {
+                $missingParts[] = 'הגדרת AI לא נמצאה';
+            } else {
+                if (!$setting->token) $missingParts[] = 'טוקן API חסר';
+                if (!$setting->content_analyzer_model) $missingParts[] = 'מודל ניתוח תוכן חסר';
+                if (!$setting->content_analyzer_prompt) $missingParts[] = 'Prompt לניתוח תוכן חסר';
+            }
+            
             Log::error("[AI Analyze] Missing AI settings", [
                 'request_id' => $requestId,
                 'has_setting' => $setting !== null,
                 'has_token' => $setting && $setting->token ? 'yes' : 'no',
                 'has_model' => $setting && $setting->content_analyzer_model ? 'yes' : 'no',
                 'has_prompt' => $setting && $setting->content_analyzer_prompt ? 'yes' : 'no',
+                'missing_parts' => $missingParts,
             ]);
-            return response()->json(['ok' => false, 'error' => 'הגדרות AI חסרות במערכת'], 500);
+            return response()->json([
+                'ok' => false, 
+                'error' => 'הגדרות AI חסרות במערכת',
+                'details' => implode(', ', $missingParts) . '. אנא הגדר את ההגדרות בדף OpenRouter Settings באדמין'
+            ], 500);
         }
 
         $prompt = $this->buildPrompt($setting->content_analyzer_prompt, $text, $classroom);
@@ -137,8 +155,18 @@ class FrontendAiAddController extends Controller
             Log::error("[AI Analyze] API failed", [
                 'request_id' => $requestId,
                 'error' => $error,
+                'classroom_id' => $classroom->id,
+                'model' => $setting->content_analyzer_model,
             ]);
-            return response()->json(['ok' => false, 'error' => 'תקשורת עם ה-AI נכשלה: ' . ($error ?: 'תגובה ריקה')], 500);
+            $errorMessage = 'תקשורת עם ה-AI נכשלה';
+            $errorDetails = $error ?: 'תגובה ריקה מהשרת';
+            return response()->json([
+                'ok' => false, 
+                'error' => $errorMessage . ': ' . $errorDetails,
+                'details' => 'השרת לא הצליח לתקשר עם OpenRouter API. ' . 
+                           ($error ? 'שגיאה: ' . $error : 'לא התקבלה תגובה מהשרת') .
+                           '. Request ID: ' . $requestId
+            ], 500);
         }
 
         $suggestion = $this->parseResponse($response);
@@ -151,11 +179,20 @@ class FrontendAiAddController extends Controller
         ]);
 
         if (!$suggestion) {
+            $responsePreview = mb_substr($response, 0, 500);
             Log::error("[AI Analyze] Parse failed", [
                 'request_id' => $requestId,
                 'raw_response' => $response,
+                'response_length' => strlen($response),
+                'response_preview' => $responsePreview,
             ]);
-            return response()->json(['ok' => false, 'error' => 'לא ניתן היה לנתח את התוכן'], 422);
+            return response()->json([
+                'ok' => false, 
+                'error' => 'לא ניתן היה לנתח את התוכן',
+                'details' => 'התגובה מה-AI לא בפורמט הצפוי. ' .
+                           'תגובה (200 תווים ראשונים): ' . $responsePreview .
+                           '. Request ID: ' . $requestId
+            ], 422);
         }
 
         $totalDuration = microtime(true) - $startTime;

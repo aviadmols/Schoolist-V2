@@ -932,33 +932,69 @@ class TemplateManager
               console.log('[AI Quick Add] Response status', response.status);
 
               if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                console.error('[AI Quick Add] Error response', errorData);
-                const errorMessage = errorData.error || errorData.message || `שגיאה ${response.status}: ${response.statusText}`;
+                let errorData = {};
+                let responseText = '';
+                try {
+                  responseText = await response.text();
+                  errorData = JSON.parse(responseText);
+                } catch (e) {
+                  // If JSON parsing fails, use the text as error
+                  errorData = { error: responseText || `שגיאה ${response.status}: ${response.statusText}` };
+                }
+                
+                console.error('[AI Quick Add] Error response', {
+                  status: response.status,
+                  statusText: response.statusText,
+                  errorData: errorData,
+                  responseText: responseText
+                });
+                
+                // Build detailed error message
+                let errorMessage = errorData.error || errorData.message || `שגיאה ${response.status}: ${response.statusText}`;
+                if (errorData.errors) {
+                  const errorsList = Object.entries(errorData.errors)
+                    .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
+                    .join(' | ');
+                  errorMessage += ' | ' + errorsList;
+                }
+                if (response.status === 500 && !errorData.error) {
+                  errorMessage += ' | שגיאת שרת פנימית - אנא נסה שוב או פנה לתמיכה';
+                }
+                
                 throw new Error(errorMessage);
               }
 
               let result;
               try {
-                result = await response.json();
+                const responseText = await response.text();
+                console.log('[AI Quick Add] Raw response text', responseText);
+                result = JSON.parse(responseText);
                 console.log('[AI Quick Add] Response data', result);
               } catch (jsonError) {
                 console.error('[AI Quick Add] Failed to parse JSON response', jsonError);
-                const text = await response.text();
+                const text = await response.text().catch(() => 'לא ניתן לקרוא את התגובה');
                 console.error('[AI Quick Add] Response text', text);
-                throw new Error('תגובה לא תקינה מהשרת');
+                throw new Error('תגובה לא תקינה מהשרת: ' + (text.substring(0, 200) || jsonError.message));
               }
               
               // Check if response is ok
               if (!result || result.ok === false) {
                 const errorMsg = result?.error || result?.message || 'לא התקבלה הצעה מה-AI';
-                console.error('[AI Quick Add] Response not ok', { result, errorMsg });
-                throw new Error(errorMsg);
+                let errorDetails = '';
+                if (result?.details) {
+                  errorDetails = '\n\nפרטים נוספים:\n' + result.details;
+                }
+                if (result?.errors) {
+                  errorDetails += '\n\nשגיאות אימות:\n' + JSON.stringify(result.errors, null, 2);
+                }
+                console.error('[AI Quick Add] Response not ok', { result, errorMsg, errorDetails });
+                throw new Error(errorMsg + errorDetails);
               }
               
               if (!result.suggestion) {
                 console.error('[AI Quick Add] No suggestion in response', result);
-                throw new Error('לא התקבלה הצעה מה-AI - התגובה לא מכילה הצעה');
+                const responsePreview = JSON.stringify(result).substring(0, 300);
+                throw new Error('לא התקבלה הצעה מה-AI - התגובה לא מכילה הצעה. תגובה: ' + responsePreview);
               }
 
               const suggestion = result.suggestion;
@@ -1001,21 +1037,41 @@ class TemplateManager
 
             } catch (error) {
               console.error('[AI Quick Add] Error analyzing:', error);
+              console.error('[AI Quick Add] Error stack:', error.stack);
+              console.error('[AI Quick Add] Error details:', {
+                name: error.name,
+                message: error.message,
+                cause: error.cause,
+                error: error
+              });
+              
               let errorMessage = 'שגיאה לא ידועה';
+              let errorDetails = '';
               
               if (error instanceof Error) {
-                errorMessage = error.message;
+                errorMessage = error.message || error.toString();
+                if (error.stack) {
+                  errorDetails = '\n\nפרטים טכניים:\n' + error.stack.split('\n').slice(0, 3).join('\n');
+                }
               } else if (typeof error === 'string') {
                 errorMessage = error;
               } else if (error && error.message) {
                 errorMessage = error.message;
+              } else {
+                errorMessage = JSON.stringify(error).substring(0, 500);
+              }
+              
+              // Build full error message
+              let fullErrorMessage = errorMessage;
+              if (errorDetails) {
+                fullErrorMessage += errorDetails;
               }
               
               // Don't duplicate "שגיאה בניתוח" prefix if it's already in the message
-              if (errorMessage.includes('שגיאה בניתוח')) {
-                alert(errorMessage);
+              if (fullErrorMessage.includes('שגיאה בניתוח')) {
+                alert(fullErrorMessage);
               } else {
-                alert('שגיאה בניתוח: ' + errorMessage);
+                alert('שגיאה בניתוח:\n\n' + fullErrorMessage);
               }
             } finally {
               quickAddSubmit.disabled = false;
