@@ -13,7 +13,10 @@ class TemplateRenderer
     private const CACHE_KEY_PREFIX = 'builder.template.resolved.';
 
     /** @var int */
-    private const CACHE_TTL_SECONDS = 60;
+    private const CACHE_TTL_SECONDS = 300; // 5 minutes - increased for better performance
+
+    /** @var array<string, BuilderTemplate|null> */
+    private static array $templateCache = [];
 
     /**
      * Render a published template by key when override is enabled.
@@ -92,10 +95,16 @@ class TemplateRenderer
      */
     public function getGlobalTemplateByKey(string $key): ?BuilderTemplate
     {
-        return BuilderTemplate::query()
+        if (array_key_exists($key, self::$templateCache)) {
+            return self::$templateCache[$key];
+        }
+
+        $template = BuilderTemplate::query()
             ->where('scope', config('builder.scope'))
             ->where('key', $key)
             ->first();
+
+        return self::$templateCache[$key] = $template;
     }
 
     /**
@@ -137,6 +146,12 @@ class TemplateRenderer
 
             $template = $this->getGlobalTemplateByKey($resolvedKey);
 
+            // For popups: if no template or override disabled, use default popup HTML
+            if ($type === 'popup' && (!$template || !$template->is_override_enabled || !$this->hasPublishedContent($template))) {
+                return $this->getDefaultPopupHtml($resolvedKey);
+            }
+
+            // For sections: return empty if no template
             if (!$template || !$template->is_override_enabled || !$this->hasPublishedContent($template)) {
                 return '';
             }
@@ -169,6 +184,59 @@ class TemplateRenderer
         }
 
         return $key;
+    }
+
+    /**
+     * Get default popup HTML when no template override exists.
+     */
+    private function getDefaultPopupHtml(string $key): string
+    {
+        $prefix = (string) config('builder.popup_prefix');
+        $shortKey = Str::after($key, $prefix);
+        $id = 'popup-'.Str::slug($shortKey);
+        
+        // Get title from config
+        $popups = (array) config('builder.default_popups', []);
+        $title = 'Popup';
+        foreach ($popups as $popup) {
+            if (($popup['key'] ?? '') === $shortKey) {
+                $title = (string) ($popup['title'] ?? $title);
+                break;
+            }
+        }
+        
+        // Get body HTML from TemplateManager
+        /** @var \App\Services\Builder\TemplateManager $templateManager */
+        $templateManager = app(\App\Services\Builder\TemplateManager::class);
+        $body = $this->getDefaultPopupBodyHtml($shortKey);
+        
+        return <<<HTML
+<div id="{$id}" class="sb-popup" data-popup>
+  <div class="sb-popup-card">
+    <div class="sb-modal-title">{$title}</div>
+    <div class="sb-modal-body">
+      {$body}
+    </div>
+    <div class="sb-modal-actions">
+      <button type="button" class="sb-button is-ghost" data-popup-close>סגור</button>
+      <button type="button" class="sb-button" data-popup-close>סיום</button>
+    </div>
+  </div>
+</div>
+HTML;
+    }
+
+    /**
+     * Get default popup body HTML by short key.
+     */
+    private function getDefaultPopupBodyHtml(string $shortKey): string
+    {
+        /** @var \App\Services\Builder\TemplateManager $templateManager */
+        $templateManager = app(\App\Services\Builder\TemplateManager::class);
+        $prefix = (string) config('builder.popup_prefix');
+        $fullKey = $prefix.$shortKey;
+        
+        return $templateManager->getPopupBodyHtml($fullKey);
     }
 
     /**
@@ -311,8 +379,8 @@ class TemplateRenderer
 
         return [
             'html' => Blade::render($parts['html'], $filteredData),
-            'css' => $parts['css'] ? Blade::render($parts['css'], $filteredData) : null,
-            'js' => $parts['js'] ? Blade::render($parts['js'], $filteredData) : null,
+            'css' => ($parts['css'] && str_contains($parts['css'], '{{')) ? Blade::render($parts['css'], $filteredData) : $parts['css'],
+            'js' => ($parts['js'] && str_contains($parts['js'], '{{')) ? Blade::render($parts['js'], $filteredData) : $parts['js'],
         ];
     }
 

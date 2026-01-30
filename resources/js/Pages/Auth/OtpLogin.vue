@@ -26,6 +26,10 @@
         <UiField label="אימייל (לא חובה)">
           <UiInput v-model="email" type="email" />
         </UiField>
+        <UiField label="מספר כיתה (לא חובה)">
+          <UiInput v-model="joinCode" type="text" placeholder="10 ספרות" maxlength="10" />
+          <p class="text-muted text-xs">אם יש לך קוד כיתה, הזינו אותו כאן</p>
+        </UiField>
       </div>
 
       <UiButton type="submit" variant="primary" :disabled="isSubmitting">
@@ -54,6 +58,7 @@ const code = ref('');
 const firstName = ref('');
 const lastName = ref('');
 const email = ref('');
+const joinCode = ref('');
 const error = ref(null);
 const isSubmitting = ref(false);
 
@@ -132,6 +137,7 @@ function handleSubmit() {
     first_name: firstName.value,
     last_name: lastName.value,
     email: email.value || null,
+    join_code: joinCode.value || null,
   })
     .then((data) => {
       if (data.redirect) {

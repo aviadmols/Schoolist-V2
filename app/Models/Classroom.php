@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Storage;
 
 class Classroom extends Model
@@ -95,11 +96,15 @@ class Classroom extends Model
         'grade_number',
         'active_days',
         'timetable_image_path',
+        'allow_member_posting',
+        'classroom_admins',
     ];
 
     /** @var array<string, string> */
     protected $casts = [
         'active_days' => 'array',
+        'classroom_admins' => 'array',
+        'allow_member_posting' => 'boolean',
     ];
 
     /**
@@ -200,5 +205,13 @@ class Classroom extends Model
     public function links(): HasMany
     {
         return $this->hasMany(ClassLink::class);
+    }
+
+    /**
+     * Weather settings for this classroom.
+     */
+    public function weatherSetting(): HasOne
+    {
+        return $this->hasOne(\App\Models\WeatherSetting::class);
     }
 }

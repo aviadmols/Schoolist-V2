@@ -52,8 +52,23 @@ class VerifyOtpController
             'request_id' => $request->header('X-Request-Id'),
         ]);
 
+        // Check if user has classrooms
+        $hasClassrooms = $user->classrooms()->exists();
+        
+        // Check for redirect_after_login from session
+        $redirectAfterLogin = session('redirect_after_login');
+        if ($redirectAfterLogin) {
+            session()->forget('redirect_after_login');
+            return response()->json([
+                'redirect' => $redirectAfterLogin,
+            ]);
+        }
+
+        // If user has classrooms, go to profile, otherwise landing
+        $redirectUrl = $hasClassrooms ? route('profile.show') : route('landing');
+
         return response()->json([
-            'redirect' => route('landing'),
+            'redirect' => $redirectUrl,
         ]);
     }
 }

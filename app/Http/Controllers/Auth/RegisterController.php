@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Models\User;
 use App\Models\OtpCode;
+use App\Services\Classroom\ClassroomService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -13,13 +14,14 @@ class RegisterController
     /**
      * Register a new user after OTP verification.
      */
-    public function __invoke(Request $request)
+    public function __invoke(Request $request, ClassroomService $classroomService)
     {
         $request->validate([
             'phone' => ['required', 'string', 'regex:/^[0-9]{10}$/'],
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'unique:users,email'],
+            'join_code' => ['nullable', 'string', 'size:10'],
         ]);
 
         // Ensure the phone was actually verified recently
@@ -43,13 +45,27 @@ class RegisterController
             'role' => 'user',
         ]);
 
+        // Join classroom if join code provided
+        $classroom = null;
+        if ($request->join_code) {
+            $classroom = $classroomService->joinWithCode($user, $request->join_code);
+            if (!$classroom) {
+                return response()->json(['message' => 'קוד הכיתה שגוי.'], 422);
+            }
+        }
+
         Auth::login($user);
 
         Log::info('New user registered', [
             'user_id' => $user->id,
+            'classroom_id' => $classroom?->id,
             'request_id' => $request->header('X-Request-Id'),
         ]);
 
-        return response()->json(['redirect' => route('landing')]);
+        $redirectUrl = $classroom 
+            ? route('classroom.show', $classroom) 
+            : route('profile.show');
+
+        return response()->json(['redirect' => $redirectUrl]);
     }
 }

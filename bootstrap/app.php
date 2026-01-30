@@ -23,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'classroom.context' => \App\Http\Middleware\EnsureClassroomContext::class,
+            'classroom.access' => \App\Http\Middleware\EnsureClassroomAccess::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -12,6 +12,10 @@ class GetOtpLoginPageController
      */
     public function __invoke(): Response
     {
-        return Inertia::render('Auth/OtpLogin', []);
+        $redirectAfterLogin = session('redirect_after_login');
+        
+        return Inertia::render('Auth/OtpLogin', [
+            'redirect_after_login' => $redirectAfterLogin,
+        ]);
     }
 }

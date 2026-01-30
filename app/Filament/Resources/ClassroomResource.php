@@ -84,6 +84,21 @@ class ClassroomResource extends Resource
                                             ->content(fn (?Classroom $record): string => $record ? number_format($record->media_size_bytes / 1024 / 1024, 2) . ' MB' : '0.00 MB')
                                             ->visible(fn (?Classroom $record) => $record !== null),
                                     ])->columns(2),
+                                Section::make('Publishing Permissions')
+                                    ->schema([
+                                        Forms\Components\Toggle::make('allow_member_posting')
+                                            ->label('Allow Members to Post')
+                                            ->helperText('If disabled, only classroom admins can publish announcements and links.')
+                                            ->default(true),
+                                        Forms\Components\Select::make('classroom_admins')
+                                            ->label('Additional Classroom Admins')
+                                            ->relationship('users', 'name', fn ($query) => $query->where('users.role', 'user'))
+                                            ->multiple()
+                                            ->searchable()
+                                            ->preload()
+                                            ->helperText('Select additional users who can manage this classroom.')
+                                            ->getOptionLabelFromRecordUsing(fn ($record) => $record->name . ' (' . ($record->email ?? $record->phone) . ')'),
+                                    ])->columns(1),
                             ]),
 
                         // --- TAB: TIMETABLE ---

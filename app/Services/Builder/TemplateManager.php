@@ -62,8 +62,81 @@ class TemplateManager
             $name = $title ?: Str::title(str_replace('-', ' ', $popupKey));
             $html = $this->getDefaultPopupHtml($name, $fullKey);
 
-            $this->createOrUpdateDefaultTemplate($fullKey, $html, self::POPUP_TYPE, $name);
+            $template = $this->createOrUpdateDefaultPopupTemplate($fullKey, $html, $name);
         }
+    }
+
+    /**
+     * Create or update a default popup template with auto-publish.
+     */
+    private function createOrUpdateDefaultPopupTemplate(
+        string $key,
+        string $defaultHtml,
+        string $name
+    ): BuilderTemplate {
+        $parts = $this->splitTemplateParts($defaultHtml);
+
+        $template = BuilderTemplate::query()->firstOrCreate(
+            ['scope' => config('builder.scope'), 'key' => $key],
+            [
+                'name' => $name,
+                'type' => self::POPUP_TYPE,
+                'draft_html' => $parts['html'],
+                'draft_css' => $parts['css'],
+                'draft_js' => $parts['js'],
+                'published_html' => $parts['html'], // Auto-publish
+                'published_css' => $parts['css'],
+                'published_js' => $parts['js'],
+                'is_override_enabled' => true, // Enable override so popups are shown
+                'created_by' => auth()->id() ?? 1,
+                'updated_by' => auth()->id() ?? 1,
+            ]
+        );
+
+        // Always update popups to ensure they have the latest content
+        // Check if content needs updating (contains placeholder or missing dynamic content)
+        $publishedHtml = $template->published_html ?? '';
+        $hasPlaceholder = str_contains($publishedHtml, 'Add your content here')
+            || str_contains($publishedHtml, 'portal.example')
+            || str_contains($publishedHtml, 'newsletter.example')
+            || str_contains($publishedHtml, 'Class portal')
+            || str_contains($publishedHtml, 'Weekly newsletter')
+            || str_contains($publishedHtml, 'Helpful resources for students')
+            || str_contains($publishedHtml, 'Math worksheet')
+            || str_contains($publishedHtml, 'Reading pages');
+        
+        // Check if popup should have dynamic content but doesn't
+        $shouldHaveDynamicContent = in_array($key, [
+            $this->resolvePopupKey('whatsapp'),
+            $this->resolvePopupKey('important-links'),
+            $this->resolvePopupKey('holidays'),
+            $this->resolvePopupKey('children'),
+            $this->resolvePopupKey('contacts'),
+            $this->resolvePopupKey('links'),
+        ]);
+        
+        // Force update if template was manually edited but should have default content
+        $needsUpdate = $this->shouldSeedTemplate($template) 
+            || $this->shouldReplaceTemplateDraft($template, $key) 
+            || !$template->published_html
+            || $hasPlaceholder
+            || ($shouldHaveDynamicContent && !str_contains($publishedHtml, '$page['))
+            || ($shouldHaveDynamicContent && !str_contains($publishedHtml, '@if'));
+
+        if ($needsUpdate && $defaultHtml) {
+            $template->update([
+                'draft_html' => $parts['html'],
+                'draft_css' => $parts['css'],
+                'draft_js' => $parts['js'],
+                'published_html' => $parts['html'], // Auto-publish
+                'published_css' => $parts['css'],
+                'published_js' => $parts['js'],
+                'is_override_enabled' => true, // Enable override
+                'updated_by' => auth()->id() ?? 1,
+            ]);
+        }
+
+        return $template;
     }
 
     /**
@@ -205,7 +278,7 @@ class TemplateManager
     /**
      * Build the default classroom page HTML.
      */
-    private function getDefaultClassroomPageHtml(): string
+    public function getDefaultClassroomPageHtml(): string
     {
         return <<<'HTML'
 <style>
@@ -216,6 +289,171 @@ class TemplateManager
   .sb-popup-card { width: 100%; max-width: 420px; background: #ffffff; border-radius: 24px 24px 0 0; padding: 20px; transform: translateY(40px); transition: transform 240ms ease; }
   .sb-popup.is-open .sb-popup-card { transform: translateY(0); }
   .logo-image { height: 20px; width: auto; display: block; }
+
+  /* Quick Add Button */
+  .fixed-add-btn {
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--blue-primary);
+    color: white;
+    border: none;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 30;
+    transition: transform 0.2s;
+  }
+  .fixed-add-btn:active { transform: scale(0.9); }
+
+  /* Quick Add Card */
+  .quick-add-card {
+    border-radius: 24px !important;
+    padding: 0 !important;
+    overflow: hidden;
+    max-width: 450px !important;
+  }
+  .quick-add-header {
+    padding: 20px;
+    position: relative;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .quick-add-header .close-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: #94a3b8;
+    cursor: pointer;
+  }
+  .quick-add-title {
+    font-size: 20px;
+    font-weight: 800;
+    text-align: center;
+    color: #0f172a;
+  }
+  .quick-add-title .subtitle {
+    font-weight: 400;
+    color: #64748b;
+    font-size: 16px;
+  }
+  .quick-add-body { padding: 20px; }
+  .input-container {
+    background: #f8fafc;
+    border-radius: 16px;
+    padding: 16px;
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+  }
+  #quick-add-text {
+    width: 100%;
+    border: none;
+    background: transparent;
+    resize: none;
+    font-family: inherit;
+    font-size: 16px;
+    color: #1e293b;
+    flex: 1;
+    min-height: 150px;
+    outline: none;
+  }
+  .file-preview-area {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #e2e8f0;
+  }
+  .file-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #64748b;
+  }
+  .remove-file-btn {
+    margin-right: auto;
+    background: none;
+    border: none;
+    color: #ef4444;
+    font-size: 18px;
+    cursor: pointer;
+  }
+  .quick-add-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+  }
+  .add-file-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    font-weight: 600;
+    color: #475569;
+    cursor: pointer;
+  }
+  .visibility-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+  }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #cbd5e1;
+    transition: .4s;
+    border-radius: 24px;
+  }
+  .slider:before {
+    position: absolute;
+    content: "";
+    height: 18px; width: 18px;
+    left: 3px; bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+  }
+  input:checked + .slider { background-color: var(--blue-primary); }
+  input:checked + .slider:before { transform: translateX(20px); }
+  .toggle-label { font-size: 14px; font-weight: 600; color: #475569; }
+  .private-only-note { font-size: 13px; color: #94a3b8; font-style: italic; }
+  .quick-add-footer { padding: 0 20px 20px 20px; }
+  .submit-btn {
+    width: 100%;
+    background: var(--blue-primary);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 18px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 </style>
 
 <div class="mobile-wrapper" dir="rtl">
@@ -252,10 +490,26 @@ class TemplateManager
     <div class="card-header">
       <div class="card-title">
         יום <span id="selected-day-name">{{ ($page['day_names'] ?? ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'])[(int) ($page['selected_day'] ?? 0)] ?? '' }}</span>
-        <span class="card-title-light">בוקר טוב!</span>
+        <span class="card-title-light">{{ $page['greeting'] ?? 'בוקר טוב' }}!</span>
       </div>
       <img src="https://app.schoolist.co.il/storage/media/assets/u4GUGAJ888XuMp1EI4roXPiQ996DzG95qiohqyID.svg" class="icon-edit-small" alt="">
     </div>
+
+    @if (!empty($page['upcoming_birthdays']))
+      <div style="padding: 12px 20px; background: #fff3cd; border-bottom: 1px solid #ffeaa7; margin-bottom: 0;">
+        <div style="font-weight: bold; margin-bottom: 4px;">🎂 ימי הולדת קרובים:</div>
+        @foreach ($page['upcoming_birthdays'] as $birthday)
+          <div style="font-size: 0.9em; color: #666;">
+            {{ $birthday['name'] ?? '' }} - {{ $birthday['date'] ?? '' }}
+            @if (!empty($birthday['days_until']) && $birthday['days_until'] == 0)
+              <span style="color: var(--blue-primary);">היום!</span>
+            @elseif (!empty($birthday['days_until']))
+              <span style="color: #666;">(בעוד {{ $birthday['days_until'] }} ימים)</span>
+            @endif
+          </div>
+        @endforeach
+      </div>
+    @endif
 
     <div id="schedule-content" class="schedule-list">
       @php
@@ -279,8 +533,17 @@ class TemplateManager
   </div>
 
   <div class="card" style="display:flex; justify-content:space-between; align-items:center; padding:12px 20px;">
-    <span class="weather-text">{{ $page['weather_text'] ?? '16-20° - מזג אוויר נוח.' }}</span>
-    <span style="font-size:24px;">☀️</span>
+    <div style="flex: 1;">
+      <div class="weather-text">{{ $page['weather']['text'] ?? '16-20° - מזג אוויר נוח.' }}</div>
+      @if (!empty($page['weather']['recommendation']))
+        <div style="font-size: 0.85em; color: #666; margin-top: 4px;">{{ $page['weather']['recommendation'] }}</div>
+      @endif
+    </div>
+    @if (!empty($page['weather']['icon']) && (str_starts_with($page['weather']['icon'], 'http') || str_starts_with($page['weather']['icon'], '/')))
+      <img src="{{ $page['weather']['icon'] }}" alt="Weather Icon" style="width: 32px; height: 32px; object-fit: contain;" />
+    @else
+      <span style="font-size:24px;">{{ $page['weather']['icon'] ?? '☀️' }}</span>
+    @endif
   </div>
 
   <div class="card" style="padding-bottom: 70px;">
@@ -291,7 +554,7 @@ class TemplateManager
       @if (!empty($page['announcements']))
         @foreach ($page['announcements'] as $announcement)
           <div
-            class="notice-row"
+            class="notice-row {{ !empty($announcement['is_done']) ? 'notice-done' : '' }}"
             data-item-popup="popup-content"
             data-item-type="{{ $announcement['type'] ?? 'message' }}"
             data-item-title="{{ $announcement['title'] ?? '' }}"
@@ -299,9 +562,14 @@ class TemplateManager
             data-item-date="{{ $announcement['date'] ?? '' }}"
             data-item-time="{{ $announcement['time'] ?? '' }}"
             data-item-location="{{ $announcement['location'] ?? '' }}"
+            data-announcement-id="{{ $announcement['id'] ?? '' }}"
+            data-is-done="{{ !empty($announcement['is_done']) ? '1' : '0' }}"
           >
-            <span style="color: var(--blue-primary);">✓</span>
-            <span>{{ $announcement['title'] ?? ($announcement['content'] ?? '') }}</span>
+            <span class="notice-check" style="color: var(--blue-primary); cursor: pointer;">✓</span>
+            <span class="notice-text">{{ $announcement['title'] ?? ($announcement['content'] ?? '') }}</span>
+            @if (!empty($announcement['created_by']))
+              <span style="font-size: 0.8em; color: #999; margin-right: 8px;">פורסם על ידי: {{ $announcement['created_by'] }}</span>
+            @endif
           </div>
         @endforeach
       @else
@@ -311,7 +579,7 @@ class TemplateManager
         </div>
       @endif
     </div>
-    <div class="fab-btn" data-popup-target="popup-homework">+</div>
+    <div class="fab-btn" data-popup-target="popup-quick-add">+</div>
   </div>
 
   <div class="card">
@@ -333,6 +601,7 @@ class TemplateManager
             data-item-date="{{ $event['date'] ?? '' }}"
             data-item-time="{{ $event['time'] ?? '' }}"
             data-item-location="{{ $event['location'] ?? '' }}"
+            data-event-id="{{ $event['id'] ?? '' }}"
           >
             <img src="https://cdn-icons-png.flaticon.com/512/2948/2948088.png" class="calendar-icon" alt="">
             <div class="event-content">
@@ -342,7 +611,13 @@ class TemplateManager
                 @if (!empty($event['time'])) <span>{{ $event['time'] }}</span> @endif
                 @if (!empty($event['location'])) <span>{{ $event['location'] }}</span> @endif
               </div>
+              @if (!empty($event['created_by']))
+                <div style="font-size: 0.8em; color: #999; margin-top: 4px;">פורסם על ידי: {{ $event['created_by'] }}</div>
+              @endif
             </div>
+            @if (!empty($event['date']) || !empty($event['time']))
+              <button type="button" class="add-to-calendar-btn" data-event-date="{{ $event['date'] ?? '' }}" data-event-time="{{ $event['time'] ?? '' }}" data-event-title="{{ $event['title'] ?? '' }}" data-event-location="{{ $event['location'] ?? '' }}" title="הוסף ליומן">📅</button>
+            @endif
           </div>
         @endforeach
       @else
@@ -412,6 +687,44 @@ class TemplateManager
     </div>
   </div>
 
+  @if (!empty($page['current_user']))
+    <div class="card" style="margin-top: 20px;">
+      <div class="card-header">
+        <div class="card-title">פרטי המשתמש</div>
+      </div>
+      <div style="padding: 12px 20px;">
+        <div style="font-weight: bold;">{{ $page['current_user']['name'] ?? '' }}</div>
+        @if (!empty($page['current_user']['phone']))
+          <div style="font-size: 0.9em; color: #666; margin-top: 4px;">{{ $page['current_user']['phone'] }}</div>
+        @endif
+      </div>
+    </div>
+  @endif
+
+  @if (!empty($page['classroom_admins']))
+    <div class="card" style="margin-top: 20px;">
+      <div class="card-header">
+        <div class="card-title">מנהלי הכיתה</div>
+      </div>
+      <div style="padding: 12px 20px;">
+        @foreach ($page['classroom_admins'] as $admin)
+          <div style="margin-bottom: 8px;">
+            @if (!empty($admin['phone']))
+              <a href="https://wa.me/{{ str_replace(['+', '-', ' ', '(', ')'], '', $admin['phone']) }}" target="_blank" style="font-weight: bold; text-decoration: none; color: inherit;">
+                {{ $admin['name'] ?? '' }}
+              </a>
+            @else
+              <span style="font-weight: bold;">{{ $admin['name'] ?? '' }}</span>
+            @endif
+            @if (!empty($admin['phone']))
+              <span style="font-size: 0.9em; color: #666; margin-right: 8px;">{{ $admin['phone'] }}</span>
+            @endif
+          </div>
+        @endforeach
+      </div>
+    </div>
+  @endif
+
   <footer class="footer">
     <div class="logo-text">schoolist</div>
     <div class="share-btn" data-popup-target="popup-links">
@@ -419,9 +732,73 @@ class TemplateManager
       שיתוף הדף
     </div>
   </footer>
+
+  <button id="ai-quick-add-trigger" class="fixed-add-btn" title="הוספה מהירה">
+    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+  </button>
 </div>
 
 <div class="sb-popup-backdrop" data-popup-backdrop></div>
+
+<div id="popup-quick-add" class="sb-popup" data-popup>
+  <div class="sb-popup-card quick-add-card">
+    <div class="quick-add-header">
+      <button class="close-btn" data-popup-close>&times;</button>
+      <div class="quick-add-title">הוספה מהירה <span class="subtitle">קדימה!</span></div>
+    </div>
+    <div class="quick-add-body">
+      <div class="input-container">
+        <textarea id="quick-add-text" placeholder="יש שיעורים באנגלית אני מצרפת קובץ של המילים להכתבה..."></textarea>
+        <div id="quick-add-file-preview" class="file-preview-area" style="display: none;">
+          <div class="file-info">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+            <span id="file-name"></span>
+            <button id="remove-file" class="remove-file-btn">&times;</button>
+          </div>
+        </div>
+      </div>
+      
+      <div class="quick-add-actions">
+        <label class="add-file-btn">
+          <input type="file" id="quick-add-file" accept="image/*" hidden>
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+          הוסף קובץ
+        </label>
+
+        @if(($page['can_manage'] ?? false) || (($page['classroom']['allow_member_posting'] ?? false)))
+          <div class="visibility-option">
+            <label class="toggle-switch">
+              <input type="checkbox" id="quick-add-is-public" checked>
+              <span class="slider"></span>
+            </label>
+            <span class="toggle-label">פרסם לכולם</span>
+          </div>
+        @else
+          <div class="private-only-note">הפרסום יהיה גלוי רק לך</div>
+        @endif
+      </div>
+    </div>
+    <div class="quick-add-footer">
+      <button id="quick-add-submit" class="submit-btn">
+        המשך
+        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="margin-right: 8px; transform: rotate(180deg);"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="popup-ai-confirm" class="sb-popup" data-popup>
+  <div class="sb-popup-card">
+    <div class="sb-modal-title">אישור פרטים</div>
+    <div id="ai-suggestion-content" class="sb-modal-body">
+      <!-- Content populated by JS -->
+    </div>
+    <div class="sb-modal-actions">
+      <button type="button" class="sb-button is-ghost" data-popup-close>ביטול</button>
+      <button type="button" id="ai-confirm-save" class="sb-button">אשר ושמור</button>
+    </div>
+  </div>
+</div>
 
 [[popup:invite]]
 [[popup:homework]]
@@ -437,13 +814,256 @@ class TemplateManager
 
 <script>
   (function () {
-    const dayNames = Array.from(document.querySelectorAll('.day-tab'))
-      .map((tab) => (tab.textContent || '').trim());
-    const timetable = {!! json_encode($page['timetable'] ?? []) !!};
-    const selectedDayNameEl = document.getElementById('selected-day-name');
-    const scheduleEl = document.getElementById('schedule-content');
+    // Wait for DOM to be fully loaded
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initClassroomPage);
+    } else {
+      initClassroomPage();
+    }
 
-    const buildScheduleHtml = (entries) => {
+    function initClassroomPage() {
+    // Wait for DOM to be ready and popups to be rendered
+    if (document.readyState === 'complete') {
+      setupClassroomPageFeatures();
+    } else {
+      window.addEventListener('load', () => {
+        setTimeout(setupClassroomPageFeatures, 200);
+      });
+    }
+    }
+
+    function setupClassroomPageFeatures() {
+      try {
+        // Quick Add Logic
+        const quickAddTrigger = document.getElementById('ai-quick-add-trigger');
+        const quickAddPopup = document.getElementById('popup-quick-add');
+        const quickAddText = document.getElementById('quick-add-text');
+        const quickAddFile = document.getElementById('quick-add-file');
+        const quickAddFilePreview = document.getElementById('quick-add-file-preview');
+        const quickAddFileName = document.getElementById('file-name');
+        const removeFileBtn = document.getElementById('remove-file');
+        const quickAddSubmit = document.getElementById('quick-add-submit');
+        const quickAddIsPublic = document.getElementById('quick-add-is-public');
+        const aiConfirmPopup = document.getElementById('popup-ai-confirm');
+        const aiConfirmSave = document.getElementById('ai-confirm-save');
+        const aiSuggestionContent = document.getElementById('ai-suggestion-content');
+        
+        let selectedFile = null;
+        let aiSuggestionData = null;
+        const classroomId = {{ ($page['classroom']['id'] ?? $classroom->id ?? null) ?: 'null' }};
+
+        // Open quick add popup
+        if (quickAddTrigger && quickAddPopup) {
+          quickAddTrigger.addEventListener('click', () => {
+            quickAddPopup.classList.add('is-open');
+            const backdrop = document.querySelector('[data-popup-backdrop]');
+            if (backdrop) backdrop.classList.add('is-open');
+          });
+        }
+
+        // File selection
+        if (quickAddFile && quickAddFilePreview && quickAddFileName) {
+          quickAddFile.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+              selectedFile = file;
+              quickAddFileName.textContent = file.name;
+              quickAddFilePreview.style.display = 'block';
+            }
+          });
+        }
+
+        // Remove file
+        if (removeFileBtn && quickAddFile && quickAddFilePreview) {
+          removeFileBtn.addEventListener('click', () => {
+            selectedFile = null;
+            quickAddFile.value = '';
+            quickAddFilePreview.style.display = 'none';
+          });
+        }
+
+        // Submit quick add - send to AI
+        if (quickAddSubmit && quickAddText) {
+          quickAddSubmit.addEventListener('click', async () => {
+            // Validate classroomId
+            if (!classroomId || classroomId === 'null') {
+              alert('שגיאה: לא נמצא מזהה כיתה');
+              return;
+            }
+
+            const text = quickAddText.value.trim();
+            if (!text && !selectedFile) {
+              alert('אנא הזן טקסט או בחר קובץ');
+              return;
+            }
+
+            quickAddSubmit.disabled = true;
+            quickAddSubmit.textContent = 'מנתח...';
+
+            try {
+              const formData = new FormData();
+              // Always send content_text, even if empty (for validation)
+              formData.append('content_text', text || '');
+              if (selectedFile) {
+                formData.append('content_file', selectedFile);
+              }
+
+              console.log('[AI Quick Add] Sending request', {
+                hasText: !!text,
+                textLength: text.length,
+                hasFile: !!selectedFile,
+                fileName: selectedFile?.name,
+                fileSize: selectedFile?.size,
+              });
+
+              const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+              if (!csrfToken) {
+                throw new Error('CSRF token לא נמצא');
+              }
+
+              const response = await fetch(`/class/${classroomId}/ai-analyze`, {
+                method: 'POST',
+                headers: {
+                  'X-CSRF-TOKEN': csrfToken,
+                },
+                body: formData,
+              });
+
+              console.log('[AI Quick Add] Response status', response.status);
+
+              if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                console.error('[AI Quick Add] Error response', errorData);
+                const errorMessage = errorData.error || errorData.message || `שגיאה ${response.status}: ${response.statusText}`;
+                throw new Error(errorMessage);
+              }
+
+              const result = await response.json();
+              
+              // Check if response is ok
+              if (!result.ok || !result.suggestion) {
+                throw new Error(result.error || 'לא התקבלה הצעה מה-AI');
+              }
+
+              const suggestion = result.suggestion;
+              aiSuggestionData = suggestion;
+              
+              // Show AI suggestion popup
+              if (aiSuggestionContent) {
+                const extractedData = suggestion.extracted_data || {};
+                const type = suggestion.type || 'announcement';
+                const typeLabel = type === 'event' ? 'אירוע' : type === 'homework' ? 'שיעורי בית' : 'הודעה';
+                
+                // Handle multiple items or single item
+                const items = extractedData.items || [extractedData];
+                const firstItem = items[0] || {};
+                
+                aiSuggestionContent.innerHTML = `
+                  <div style="margin-bottom: 16px;">
+                    <strong>סוג:</strong> ${typeLabel}<br>
+                    <strong>כותרת:</strong> ${firstItem.title || firstItem.name || ''}<br>
+                    <strong>תוכן:</strong> ${firstItem.content || firstItem.description || ''}<br>
+                    ${firstItem.date || firstItem.due_date ? `<strong>תאריך:</strong> ${firstItem.date || firstItem.due_date}<br>` : ''}
+                    ${firstItem.time ? `<strong>שעה:</strong> ${firstItem.time}<br>` : ''}
+                    ${firstItem.location ? `<strong>מיקום:</strong> ${firstItem.location}<br>` : ''}
+                  </div>
+                `;
+              }
+
+              // Close quick add popup
+              if (quickAddPopup) {
+                quickAddPopup.classList.remove('is-open');
+              }
+              const backdrop = document.querySelector('[data-popup-backdrop]');
+              if (backdrop) backdrop.classList.remove('is-open');
+
+              // Open AI confirm popup
+              if (aiConfirmPopup) {
+                aiConfirmPopup.classList.add('is-open');
+                if (backdrop) backdrop.classList.add('is-open');
+              }
+
+            } catch (error) {
+              console.error('Error analyzing:', error);
+              alert('שגיאה בניתוח: ' + (error.message || 'שגיאה לא ידועה'));
+            } finally {
+              quickAddSubmit.disabled = false;
+              quickAddSubmit.textContent = 'המשך';
+            }
+          });
+        }
+
+        // Save AI suggestion
+        if (aiConfirmSave) {
+          aiConfirmSave.addEventListener('click', async () => {
+            if (!aiSuggestionData) return;
+
+            // Validate classroomId
+            if (!classroomId || classroomId === 'null') {
+              alert('שגיאה: לא נמצא מזהה כיתה');
+              return;
+            }
+
+            aiConfirmSave.disabled = true;
+            aiConfirmSave.textContent = 'שומר...';
+
+            try {
+              const isPublic = quickAddIsPublic ? quickAddIsPublic.checked : false;
+              
+              const response = await fetch(`/class/${classroomId}/ai-store`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+                body: JSON.stringify({
+                  suggestion: aiSuggestionData,
+                  is_public: isPublic,
+                }),
+              });
+
+              if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || 'שגיאה בשמירה');
+              }
+
+              // Close popups and reset form
+              if (aiConfirmPopup) {
+                aiConfirmPopup.classList.remove('is-open');
+              }
+              const backdrop = document.querySelector('[data-popup-backdrop]');
+              if (backdrop) backdrop.classList.remove('is-open');
+
+              if (quickAddText) quickAddText.value = '';
+              if (quickAddFile) quickAddFile.value = '';
+              if (quickAddFilePreview) quickAddFilePreview.style.display = 'none';
+              selectedFile = null;
+              aiSuggestionData = null;
+
+              // Reload page to show new content
+              window.location.reload();
+
+            } catch (error) {
+              console.error('Error saving:', error);
+              alert('שגיאה בשמירה: ' + (error.message || 'שגיאה לא ידועה'));
+            } finally {
+              aiConfirmSave.disabled = false;
+              aiConfirmSave.textContent = 'אשר ושמור';
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Error in setupClassroomPageFeatures:', err);
+      }
+
+      // Day selection and schedule rendering
+      const dayNames = Array.from(document.querySelectorAll('.day-tab'))
+        .map((tab) => (tab && tab.textContent) ? tab.textContent.trim() : '');
+      const timetable = {!! json_encode($page['timetable'] ?? []) !!};
+      const selectedDayNameEl = document.getElementById('selected-day-name');
+      const scheduleEl = document.getElementById('schedule-content');
+
+      const buildScheduleHtml = (entries) => {
       if (!Array.isArray(entries) || entries.length === 0) {
         return '<div class="schedule-row"><span class="schedule-subject">---</span><span class="schedule-time">08:00-09:00</span></div>';
       }
@@ -457,46 +1077,46 @@ class TemplateManager
       }).join('');
     };
 
-    const renderSchedule = (dayIndex) => {
-      if (!scheduleEl) return;
-      const name = dayNames[dayIndex] || '';
-      if (selectedDayNameEl) {
-        selectedDayNameEl.textContent = name;
-      }
-      scheduleEl.innerHTML = buildScheduleHtml(timetable[dayIndex] || []);
-    };
+      const renderSchedule = (dayIndex) => {
+        if (!scheduleEl) return;
+        const name = dayNames[dayIndex] || '';
+        if (selectedDayNameEl) {
+          selectedDayNameEl.textContent = name;
+        }
+        scheduleEl.innerHTML = buildScheduleHtml(timetable[dayIndex] || []);
+      };
 
-    document.querySelectorAll('.day-tab').forEach((tab) => {
+      document.querySelectorAll('.day-tab').forEach((tab) => {
       tab.addEventListener('click', () => {
         document.querySelectorAll('.day-tab').forEach((item) => item.classList.remove('active'));
         tab.classList.add('active');
         const dayIndex = parseInt(tab.getAttribute('data-day') || '0', 10);
         renderSchedule(dayIndex);
       });
-    });
+      });
 
-    const initialTab = document.querySelector('.day-tab.active');
-    if (initialTab) {
-      const dayIndex = parseInt(initialTab.getAttribute('data-day') || '0', 10);
-      renderSchedule(dayIndex);
-    }
+      const initialTab = document.querySelector('.day-tab.active');
+      if (initialTab) {
+        const dayIndex = parseInt(initialTab.getAttribute('data-day') || '0', 10);
+        renderSchedule(dayIndex);
+      }
 
-    const list = document.getElementById('draggable-list');
-    let draggingItem = null;
+      const list = document.getElementById('draggable-list');
+      let draggingItem = null;
 
-    const getDragAfterElement = (container, y) => {
+      const getDragAfterElement = (container, y) => {
       const draggableElements = [...container.querySelectorAll('.link-card:not([style*="opacity: 0.5"])')];
-      return draggableElements.reduce((closest, child) => {
-        const box = child.getBoundingClientRect();
-        const offset = y - box.top - box.height / 2;
-        if (offset < 0 && offset > closest.offset) {
-          return { offset: offset, element: child };
-        }
-        return closest;
-      }, { offset: Number.NEGATIVE_INFINITY }).element;
-    };
+        return draggableElements.reduce((closest, child) => {
+          const box = child.getBoundingClientRect();
+          const offset = y - box.top - box.height / 2;
+          if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+          }
+          return closest;
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+      };
 
-    if (list) {
+      if (list) {
       list.addEventListener('dragstart', (event) => {
         const target = event.target;
         if (!(target instanceof HTMLElement)) return;
@@ -520,96 +1140,361 @@ class TemplateManager
         } else {
           list.insertBefore(draggingItem, afterElement);
         }
-      });
-    }
-
-    const contentPopupTitle = document.getElementById('popup-content-title');
-    const contentPopupType = document.getElementById('popup-content-type');
-    const contentPopupBody = document.getElementById('popup-content-body');
-    const contentPopupDate = document.getElementById('popup-content-date');
-    const contentPopupTime = document.getElementById('popup-content-time');
-    const contentPopupLocation = document.getElementById('popup-content-location');
-    const typeLabels = {
-      message: 'הודעה',
-      event: 'אירוע',
-      homework: 'שיעורי בית',
-    };
-
-    const setContentPopup = (dataset) => {
-      const type = dataset.itemType || 'message';
-      if (contentPopupType) {
-        contentPopupType.textContent = typeLabels[type] || type;
+        });
       }
-      if (contentPopupTitle) {
-        contentPopupTitle.textContent = dataset.itemTitle || '';
-      }
-      if (contentPopupBody) {
-        contentPopupBody.textContent = dataset.itemContent || '';
-      }
-      if (contentPopupDate) {
-        contentPopupDate.textContent = dataset.itemDate || '';
-      }
-      if (contentPopupTime) {
-        contentPopupTime.textContent = dataset.itemTime || '';
-      }
-      if (contentPopupLocation) {
-        contentPopupLocation.textContent = dataset.itemLocation || '';
-      }
-    };
 
-    const backdrop = document.querySelector('[data-popup-backdrop]');
-    const popups = document.querySelectorAll('[data-popup]');
+      // Safely get popup content elements
+      const contentPopupTitle = document.getElementById('popup-content-title');
+      const contentPopupType = document.getElementById('popup-content-type');
+      const contentPopupBody = document.getElementById('popup-content-body');
+      const contentPopupDate = document.getElementById('popup-content-date');
+      const contentPopupTime = document.getElementById('popup-content-time');
+      const contentPopupLocation = document.getElementById('popup-content-location');
+      
+      // Log if popup elements are missing (for debugging)
+      if (!contentPopupTitle || !contentPopupType || !contentPopupBody) {
+        console.warn('Some popup content elements are missing. Popup may not work correctly.');
+      }
+      const typeLabels = {
+        message: 'הודעה',
+        event: 'אירוע',
+        homework: 'שיעורי בית',
+      };
 
-    const closePopups = () => {
-      popups.forEach((popup) => popup.classList.remove('is-open'));
-      backdrop?.classList.remove('is-open');
-    };
-
-    const openPopup = (popupId) => {
-      const target = document.getElementById(popupId);
-      if (!target) return;
-      popups.forEach((popup) => popup.classList.remove('is-open'));
-      target.classList.add('is-open');
-      backdrop?.classList.add('is-open');
-    };
-
-    document.querySelectorAll('[data-item-popup]').forEach((trigger) => {
-      trigger.addEventListener('click', (event) => {
-        event.preventDefault();
-        const targetId = trigger.getAttribute('data-item-popup');
-        if (!targetId) return;
-        setContentPopup(trigger.dataset);
-        openPopup(targetId);
-      });
-    });
-
-    document.querySelectorAll('[data-popup-target]').forEach((trigger) => {
-      trigger.addEventListener('click', (event) => {
-        event.preventDefault();
-        const target = trigger.getAttribute('data-popup-target');
-        if (target) {
-          openPopup(target);
+      const setContentPopup = (dataset) => {
+        if (!dataset) return;
+        try {
+          const type = dataset.itemType || 'message';
+          if (contentPopupType) {
+            contentPopupType.textContent = typeLabels[type] || type;
+          }
+          if (contentPopupTitle) {
+            contentPopupTitle.textContent = dataset.itemTitle || '';
+          }
+          if (contentPopupBody) {
+            contentPopupBody.textContent = dataset.itemContent || '';
+          }
+          if (contentPopupDate) {
+            contentPopupDate.textContent = dataset.itemDate || '';
+          }
+          if (contentPopupTime) {
+            contentPopupTime.textContent = dataset.itemTime || '';
+          }
+          if (contentPopupLocation) {
+            contentPopupLocation.textContent = dataset.itemLocation || '';
+          }
+        } catch (err) {
+          // Silently fail
         }
-      });
-    });
+      };
 
-    document.querySelectorAll('[data-popup-close]').forEach((button) => {
-      button.addEventListener('click', (event) => {
-        event.preventDefault();
-        closePopups();
-      });
-    });
+      const backdrop = document.querySelector('[data-popup-backdrop]');
+      const popups = document.querySelectorAll('[data-popup]');
+      
+      // Log popup count for debugging
+      if (popups.length === 0) {
+        console.warn('No popups found in DOM. Popups may not be rendered correctly.');
+      } else {
+        console.log(`Found ${popups.length} popups in DOM.`);
+      }
 
-    backdrop?.addEventListener('click', closePopups);
+      const closePopups = () => {
+        popups.forEach((popup) => popup.classList.remove('is-open'));
+        backdrop?.classList.remove('is-open');
+      };
+
+      const openPopup = (popupId) => {
+        try {
+          if (!popupId) {
+            console.warn('openPopup: popupId is empty');
+            return;
+          }
+          const target = document.getElementById(popupId);
+          if (!target) {
+            console.warn('Popup not found:', popupId, 'Available popups:', Array.from(document.querySelectorAll('[data-popup]')).map(p => p.id));
+            return;
+          }
+          if (popups && popups.length > 0) {
+            popups.forEach((popup) => {
+              if (popup) popup.classList.remove('is-open');
+            });
+          }
+          target.classList.add('is-open');
+          if (backdrop) {
+            backdrop.classList.add('is-open');
+          }
+        } catch (err) {
+          console.error('Error opening popup:', err, 'popupId:', popupId);
+        }
+      };
+
+      // Setup popup triggers with error handling
+      try {
+        const itemPopupTriggers = document.querySelectorAll('[data-item-popup]');
+        if (itemPopupTriggers && itemPopupTriggers.length > 0) {
+          itemPopupTriggers.forEach((trigger) => {
+            if (!trigger || typeof trigger.addEventListener !== 'function') return;
+            try {
+              trigger.addEventListener('click', (event) => {
+                try {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (!trigger) return;
+                  // Safe dataset access
+                  let dataset = {};
+                  try {
+                    if (trigger && trigger.dataset) {
+                      dataset = trigger.dataset;
+                    }
+                  } catch (e) {
+                    // Ignore
+                  }
+                  const targetId = trigger.getAttribute('data-item-popup');
+                  if (!targetId) return;
+                  setContentPopup(dataset);
+                  openPopup(targetId);
+                } catch (err) {
+                  // Ignore
+                }
+              });
+            } catch (err) {
+              console.error('Error adding event listener to trigger:', err);
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Error setting up item popup triggers:', err);
+      }
+
+      try {
+        const popupTargetTriggers = document.querySelectorAll('[data-popup-target]');
+        if (popupTargetTriggers && popupTargetTriggers.length > 0) {
+          popupTargetTriggers.forEach((trigger) => {
+          if (!trigger || typeof trigger.addEventListener !== 'function') return;
+          try {
+            trigger.addEventListener('click', (event) => {
+              try {
+                event.preventDefault();
+                event.stopPropagation();
+                if (!trigger) return;
+                const target = trigger.getAttribute('data-popup-target');
+                if (target) {
+                  openPopup(target);
+                }
+              } catch (err) {
+                console.error('Error handling popup target click:', err);
+              }
+            });
+          } catch (err) {
+            console.error('Error adding event listener to popup target:', err);
+          }
+          });
+        }
+      } catch (err) {
+        console.error('Error setting up popup target triggers:', err);
+      }
+
+      try {
+        const closeButtons = document.querySelectorAll('[data-popup-close]');
+      if (closeButtons && closeButtons.length > 0) {
+        closeButtons.forEach((button) => {
+          if (!button || typeof button.addEventListener !== 'function') return;
+          button.addEventListener('click', (event) => {
+            event.preventDefault();
+            closePopups();
+          });
+          });
+        }
+      } catch (err) {
+        console.error('Error setting up close buttons:', err);
+      }
+
+      if (backdrop && typeof backdrop.addEventListener === 'function') {
+        backdrop.addEventListener('click', closePopups);
+      }
+
+      // Handle child contacts toggle
+      document.querySelectorAll('.child-name').forEach((nameEl) => {
+      if (!nameEl) return;
+      nameEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        if (!nameEl) return;
+        const childRow = nameEl.closest('.child-row');
+        if (!childRow) return;
+        const childId = childRow.getAttribute('data-child-id');
+        if (!childId) return;
+        const contactsEl = document.querySelector(`.child-contacts[data-child-id="${childId}"]`);
+        if (contactsEl) {
+          contactsEl.style.display = contactsEl.style.display === 'none' ? 'block' : 'none';
+          }
+        });
+      });
+
+      // Handle announcement toggle
+      document.querySelectorAll('.notice-check').forEach((checkEl) => {
+      if (!checkEl) return;
+      checkEl.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        if (!checkEl) return;
+        const noticeRow = checkEl.closest('.notice-row');
+        if (!noticeRow) return;
+        const announcementId = noticeRow.getAttribute('data-announcement-id');
+        if (!announcementId) return;
+
+        const isDone = noticeRow.classList.contains('notice-done');
+        
+        try {
+          const response = await fetch(`/announcements/${announcementId}/done`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            },
+            credentials: 'same-origin',
+          });
+
+          if (response.ok) {
+            if (!isDone) {
+              noticeRow.classList.add('notice-done');
+              noticeRow.setAttribute('data-is-done', '1');
+              // Confetti effect
+              createConfetti();
+            } else {
+              noticeRow.classList.remove('notice-done');
+              noticeRow.setAttribute('data-is-done', '0');
+            }
+          }
+        } catch (error) {
+          console.error('Failed to toggle announcement:', error);
+          }
+        });
+      });
+
+      // Handle add to calendar
+      document.querySelectorAll('.add-to-calendar-btn').forEach((btn) => {
+      if (!btn) return;
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        if (!btn) return;
+        const date = btn.getAttribute('data-event-date') || '';
+        const time = btn.getAttribute('data-event-time') || '';
+        const title = btn.getAttribute('data-event-title') || '';
+        const location = btn.getAttribute('data-event-location') || '';
+
+        if (!date) return;
+
+        const [day, month, year] = date.split('.');
+        const [hours, minutes] = time ? time.split(':') : ['12', '00'];
+        const startDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hours), parseInt(minutes));
+        const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+
+        const formatICSDate = (date) => {
+          return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        };
+
+        const icsContent = [
+          'BEGIN:VCALENDAR',
+          'VERSION:2.0',
+          'PRODID:-//Schoolist//Classroom Events//EN',
+          'BEGIN:VEVENT',
+          `DTSTART:${formatICSDate(startDate)}`,
+          `DTEND:${formatICSDate(endDate)}`,
+          `SUMMARY:${title}`,
+          location ? `LOCATION:${location}` : '',
+          'END:VEVENT',
+          'END:VCALENDAR',
+        ].filter(Boolean).join('\r\n');
+
+        const blob = new Blob([icsContent], { type: 'text/calendar' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${title.replace(/[^a-z0-9]/gi, '_')}.ics`;
+        document.body.appendChild(link);
+        link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        });
+      });
+
+      // Confetti effect function
+      function createConfetti() {
+      const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#6c5ce7'];
+      const confettiCount = 50;
+      
+      for (let i = 0; i < confettiCount; i++) {
+        const confetti = document.createElement('div');
+        confetti.style.position = 'fixed';
+        confetti.style.width = '8px';
+        confetti.style.height = '8px';
+        confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        confetti.style.left = Math.random() * 100 + '%';
+        confetti.style.top = '-10px';
+        confetti.style.borderRadius = '50%';
+        confetti.style.pointerEvents = 'none';
+        confetti.style.zIndex = '9999';
+        confetti.style.opacity = '0.9';
+        
+        document.body.appendChild(confetti);
+        
+        const animation = confetti.animate([
+          { transform: 'translateY(0) rotate(0deg)', opacity: 1 },
+          { transform: `translateY(${window.innerHeight + 100}px) rotate(720deg)`, opacity: 0 }
+        ], {
+          duration: 2000 + Math.random() * 1000,
+          easing: 'cubic-bezier(0.5, 0, 0.5, 1)',
+        });
+        
+          animation.onfinish = () => confetti.remove();
+        }
+      }
+    } // End of setupClassroomPageFeatures
   })();
 </script>
+<style>
+  .notice-done .notice-text {
+    text-decoration: line-through;
+    opacity: 0.6;
+  }
+  .notice-done .notice-check {
+    color: #999 !important;
+  }
+  .add-to-calendar-btn {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px 8px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+  }
+  .add-to-calendar-btn:hover {
+    opacity: 1;
+  }
+  .child-contacts {
+    animation: slideDown 0.3s ease-out;
+  }
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      max-height: 0;
+    }
+    to {
+      opacity: 1;
+      max-height: 500px;
+    }
+  }
+</style>
 HTML;
     }
 
     /**
      * Build the default popup HTML.
      */
-    private function getDefaultPopupHtml(string $title, string $key): string
+    public function getDefaultPopupHtml(string $title, string $key): string
     {
         $id = $this->getPopupIdFromKey($key);
         $body = $this->getPopupBodyHtml($key);
@@ -835,7 +1720,7 @@ HTML;
     /**
      * Build popup body HTML by key.
      */
-    private function getPopupBodyHtml(string $key): string
+    public function getPopupBodyHtml(string $key): string
     {
         $shortKey = Str::after($key, (string) config('builder.popup_prefix'));
 
@@ -963,7 +1848,12 @@ HTML;
   @if (!empty($page['holidays']))
     @foreach ($page['holidays'] as $holiday)
       <div class="sb-row">
-        <span>{{ $holiday['name'] ?? '' }}</span>
+        <span>
+          {{ $holiday['name'] ?? '' }}
+          @if (!empty($holiday['has_kitan']) && $holiday['has_kitan'])
+            <span style="color: var(--blue-primary); margin-right: 4px;">🎒</span>
+          @endif
+        </span>
         <span>
           @if (!empty($holiday['start_date']))
             {{ $holiday['start_date'] }}
@@ -988,12 +1878,28 @@ HTML;
     {
         return <<<'HTML'
 <p>רשימת הילדים בכיתה.</p>
-<div class="sb-list">
+<div class="sb-list" id="children-list">
   @if (!empty($page['children']))
     @foreach ($page['children'] as $child)
-      <div class="sb-row">
-        <span>{{ $child['name'] ?? '' }}</span>
+      <div class="sb-row child-row" data-child-id="{{ $child['id'] ?? '' }}">
+        <span class="child-name" style="cursor: pointer; font-weight: bold;">{{ $child['name'] ?? '' }}</span>
         <span>{{ $child['birth_date'] ?? '' }}</span>
+      </div>
+      <div class="child-contacts" data-child-id="{{ $child['id'] ?? '' }}" style="display: none; padding-right: 20px; margin-top: 8px;">
+        @if (!empty($child['contacts']))
+          @foreach ($child['contacts'] as $contact)
+            <div class="sb-row" style="font-size: 0.9em; color: #666;">
+              <span>{{ $contact['name'] ?? '' }} ({{ $contact['relation'] ?? '' }})</span>
+              <span>
+                @if (!empty($contact['phone']))
+                  <a href="tel:{{ $contact['phone'] }}" style="margin-left: 8px;">📞</a>
+                  <a href="https://wa.me/{{ str_replace(['+', '-', ' ', '(', ')'], '', $contact['phone']) }}" target="_blank" style="margin-left: 4px;">💬</a>
+                  <a href="tel:{{ $contact['phone'] }}?add" style="margin-left: 4px;">➕</a>
+                @endif
+              </span>
+            </div>
+          @endforeach
+        @endif
       </div>
     @endforeach
   @else
@@ -1037,8 +1943,16 @@ HTML;
   @if (!empty($page['important_contacts']))
     @foreach ($page['important_contacts'] as $contact)
       <div class="sb-row">
-        <span>{{ $contact['name'] ?? '' }}</span>
-        <span>{{ $contact['phone'] ?? ($contact['email'] ?? '') }}</span>
+        <span>{{ $contact['name'] ?? '' }} @if (!empty($contact['role']))<span style="color: #666; font-size: 0.9em;">({{ $contact['role'] }})</span>@endif</span>
+        <span>
+          @if (!empty($contact['phone']))
+            <a href="tel:{{ $contact['phone'] }}" style="margin-left: 8px;">{{ $contact['phone'] }}</a>
+            <a href="https://wa.me/{{ str_replace(['+', '-', ' ', '(', ')'], '', $contact['phone']) }}" target="_blank" style="margin-left: 4px;">💬</a>
+            <a href="tel:{{ $contact['phone'] }}?add" style="margin-left: 4px;">➕</a>
+          @elseif (!empty($contact['email']))
+            <a href="mailto:{{ $contact['email'] }}">{{ $contact['email'] }}</a>
+          @endif
+        </span>
       </div>
     @endforeach
   @else
@@ -1081,7 +1995,7 @@ HTML;
      *
      * @return array{html: string, css: string|null, js: string|null}
      */
-    private function splitTemplateParts(string $html): array
+    public function splitTemplateParts(string $html): array
     {
         $css = null;
         $js = null;
