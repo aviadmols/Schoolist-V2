@@ -1,9 +1,7 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -26,9 +24,13 @@ return new class extends Migration
             }
         }
 
-        Schema::table('classrooms', function (Blueprint $table) {
-            $table->string('join_code', 4)->unique()->change();
-        });
+        // Only change column length; do not touch existing unique index (avoids 1061 duplicate key).
+        $driver = DB::getDriverName();
+        if ($driver === 'mysql') {
+            DB::statement('ALTER TABLE classrooms MODIFY join_code VARCHAR(4) NOT NULL');
+        } else {
+            DB::statement('ALTER TABLE classrooms ALTER COLUMN join_code TYPE VARCHAR(4)');
+        }
     }
 
     /**
@@ -36,8 +38,11 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('classrooms', function (Blueprint $table) {
-            $table->string('join_code', 10)->unique()->change();
-        });
+        $driver = DB::getDriverName();
+        if ($driver === 'mysql') {
+            DB::statement('ALTER TABLE classrooms MODIFY join_code VARCHAR(10) NOT NULL');
+        } else {
+            DB::statement('ALTER TABLE classrooms ALTER COLUMN join_code TYPE VARCHAR(10)');
+        }
     }
 };
