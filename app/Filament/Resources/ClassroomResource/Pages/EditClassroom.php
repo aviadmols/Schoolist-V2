@@ -533,7 +533,7 @@ class EditClassroom extends EditRecord
                 ]);
 
                 try {
-                    $announcement = Announcement::create([
+                    $announcementData = [
                         'classroom_id' => $classroomId,
                         'user_id' => auth()->id(),
                         'type' => $announcementType,
@@ -543,7 +543,15 @@ class EditClassroom extends EditRecord
                         'day_of_week' => $dateData['day_of_week'],
                         'occurs_at_time' => $this->normalizeTime($item['time'] ?? null),
                         'location' => (string) ($item['location'] ?? ''),
+                    ];
+                    
+                    Log::info("[Admin Create Content] Announcement data prepared", [
+                        'request_id' => $requestId,
+                        'index' => $index,
+                        'data' => $announcementData,
                     ]);
+                    
+                    $announcement = Announcement::create($announcementData);
                     
                     Log::info("[Admin Create Content] Announcement created", [
                         'request_id' => $requestId,

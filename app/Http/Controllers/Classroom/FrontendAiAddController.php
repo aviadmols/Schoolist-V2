@@ -356,7 +356,7 @@ class FrontendAiAddController extends Controller
                     'location' => $item['location'] ?? null,
                 ]);
                 
-                $announcement = Announcement::create([
+                $announcementData = [
                     'classroom_id' => $classroom->id,
                     'user_id' => auth()->id(),
                     'type' => $announcementType,
@@ -365,7 +365,15 @@ class FrontendAiAddController extends Controller
                     'occurs_on_date' => $parsedDate,
                     'occurs_at_time' => $item['time'] ?? null,
                     'location' => $item['location'] ?? null,
+                ];
+                
+                Log::info("[Frontend Create Announcements] Announcement data prepared", [
+                    'request_id' => $requestId,
+                    'index' => $index,
+                    'data' => $announcementData,
                 ]);
+                
+                $announcement = Announcement::create($announcementData);
                 
                 Log::info("[Frontend Create Announcements] Item created", [
                     'request_id' => $requestId,
