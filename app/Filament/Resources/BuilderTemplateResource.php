@@ -35,108 +35,122 @@ class BuilderTemplateResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            Forms\Components\TextInput::make('name')
-                ->label('Name')
-                ->required()
-                ->maxLength(255),
-            Forms\Components\TextInput::make('key')
-                ->label('Key')
-                ->disabled()
-                ->dehydrated(),
-            Forms\Components\Select::make('type')
-                ->label('Type')
-                ->options([
-                    BuilderTemplate::TYPE_SCREEN => 'Screen',
-                    BuilderTemplate::TYPE_SECTION => 'Section',
-                ])
-                ->disabled()
-                ->dehydrated(),
-            Forms\Components\Toggle::make('is_override_enabled')
-                ->label('Override Enabled'),
-            Grid::make(2)
+            Section::make('Template info')
                 ->schema([
-                    Select::make('preview_classroom_id')
-                        ->label('Preview Classroom')
-                        ->options(function (): array {
-                            return Classroom::query()
-                                ->orderBy('name', 'asc')
-                                ->limit(50)
-                                ->pluck('name', 'id')
-                                ->all();
-                        })
-                        ->searchable()
-                        ->live()
-                        ->dehydrated(false),
-                    Select::make('preview_user_id')
-                        ->label('Preview User')
-                        ->options(function (): array {
-                            return User::query()
-                                ->orderBy('name', 'asc')
-                                ->limit(50)
-                                ->pluck('name', 'id')
-                                ->all();
-                        })
-                        ->searchable()
-                        ->live()
-                        ->dehydrated(false),
+                    Forms\Components\TextInput::make('name')
+                        ->label('Name')
+                        ->required()
+                        ->maxLength(255),
+                    Forms\Components\TextInput::make('key')
+                        ->label('Key')
+                        ->disabled()
+                        ->dehydrated(),
+                    Forms\Components\Select::make('type')
+                        ->label('Type')
+                        ->options([
+                            BuilderTemplate::TYPE_SCREEN => 'Screen',
+                            BuilderTemplate::TYPE_SECTION => 'Section',
+                        ])
+                        ->disabled()
+                        ->dehydrated(),
+                    Forms\Components\Toggle::make('is_override_enabled')
+                        ->label('Override Enabled'),
+                    Grid::make(2)
+                        ->schema([
+                            Select::make('preview_classroom_id')
+                                ->label('Preview Classroom')
+                                ->options(function (): array {
+                                    return Classroom::query()
+                                        ->orderBy('name', 'asc')
+                                        ->limit(50)
+                                        ->pluck('name', 'id')
+                                        ->all();
+                                })
+                                ->searchable()
+                                ->live()
+                                ->dehydrated(false),
+                            Select::make('preview_user_id')
+                                ->label('Preview User')
+                                ->options(function (): array {
+                                    return User::query()
+                                        ->orderBy('name', 'asc')
+                                        ->limit(50)
+                                        ->pluck('name', 'id')
+                                        ->all();
+                                })
+                                ->searchable()
+                                ->live()
+                                ->dehydrated(false),
+                        ]),
+                ])
+                ->collapsed()
+                ->columnSpanFull(),
+            Section::make('CSS')
+                ->description('HTML and JS are in template files (Git). Edit only CSS here.')
+                ->schema([
+                    Grid::make(2)
+                        ->schema([
+                            Section::make('Preview')
+                                ->schema([
+                                    Placeholder::make('preview')
+                                        ->label('')
+                                        ->content(function (?BuilderTemplate $record, Get $get): HtmlString {
+                                            if (!$record) {
+                                                return new HtmlString('');
+                                            }
+
+                                            $params = array_filter([
+                                                'template' => $record,
+                                                'version' => 'published',
+                                                'preview_classroom_id' => $get('preview_classroom_id'),
+                                                'preview_user_id' => $get('preview_user_id'),
+                                            ]);
+                                            $url = route('builder.preview', $params);
+
+                                            return new HtmlString(
+                                                view('filament.builder-template-preview', ['previewUrl' => $url])->render()
+                                            );
+                                        }),
+                                ])
+                                ->columnSpan(1),
+                            Section::make('Editor')
+                                ->schema([
+                                    CodeEditor::make('published_css')
+                                        ->label('')
+                                        ->rows(24),
+                                ])
+                                ->columnSpan(1),
+                        ])
+                        ->columnSpanFull(),
                 ])
                 ->columnSpanFull(),
-            Grid::make(2)
+            Section::make('Mock Data JSON')
                 ->schema([
-                    Section::make('Preview')
-                        ->schema([
-                            Placeholder::make('preview')
-                                ->label('')
-                                ->content(function (?BuilderTemplate $record, Get $get): HtmlString {
-                                    if (!$record) {
-                                        return new HtmlString('');
-                                    }
+                    Forms\Components\Textarea::make('mock_data_json')
+                        ->label('Mock Data JSON')
+                        ->rows(6)
+                        ->helperText('Optional JSON object for preview.')
+                        ->rule('nullable')
+                        ->rule('json')
+                        ->formatStateUsing(function ($state): string {
+                            if (!$state) {
+                                return '';
+                            }
 
-                                    $params = array_filter([
-                                        'template' => $record,
-                                        'version' => 'published',
-                                        'preview_classroom_id' => $get('preview_classroom_id'),
-                                        'preview_user_id' => $get('preview_user_id'),
-                                    ]);
-                                    $url = route('builder.preview', $params);
+                            return json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: '';
+                        })
+                        ->dehydrateStateUsing(function ($state): ?array {
+                            if (!$state) {
+                                return null;
+                            }
 
-                                    return new HtmlString(
-                                        view('filament.builder-template-preview', ['previewUrl' => $url])->render()
-                                    );
-                                }),
-                        ])
-                        ->columnSpan(1),
-                    Section::make('CSS')
-                        ->schema([
-                            CodeEditor::make('published_css')
-                                ->label('')
-                                ->rows(18),
-                        ])
-                        ->columnSpan(1),
+                            $decoded = json_decode($state, true);
+
+                            return is_array($decoded) ? $decoded : null;
+                        })
+                        ->columnSpanFull(),
                 ])
-                ->columnSpanFull(),
-            Forms\Components\Textarea::make('mock_data_json')
-                ->label('Mock Data JSON')
-                ->rows(6)
-                ->helperText('Optional JSON object for preview.')
-                ->rule('nullable')
-                ->rule('json')
-                ->formatStateUsing(function ($state): string {
-                    if (!$state) {
-                        return '';
-                    }
-
-                    return json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: '';
-                })
-                ->dehydrateStateUsing(function ($state): ?array {
-                    if (!$state) {
-                        return null;
-                    }
-
-                    $decoded = json_decode($state, true);
-
-                    return is_array($decoded) ? $decoded : null;
-                })
+                ->collapsed()
                 ->columnSpanFull(),
         ]);
     }
