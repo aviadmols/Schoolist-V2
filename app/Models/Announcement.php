@@ -39,7 +39,16 @@ class Announcement extends Model
     protected static function booted(): void
     {
         static::creating(function (Announcement $announcement) {
-            $announcement->updateClassroomMediaSize(null, $announcement->attachment_path);
+            try {
+                $announcement->updateClassroomMediaSize(null, $announcement->attachment_path);
+            } catch (\Throwable $e) {
+                // Log but don't fail creation if media size update fails
+                \Illuminate\Support\Facades\Log::warning('Failed to update classroom media size during announcement creation', [
+                    'announcement_id' => $announcement->id ?? null,
+                    'classroom_id' => $announcement->classroom_id ?? null,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         });
 
         static::updating(function (Announcement $announcement) {

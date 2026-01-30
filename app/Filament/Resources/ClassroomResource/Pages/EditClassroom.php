@@ -441,12 +441,32 @@ class EditClassroom extends EditRecord
         $requestId = uniqid('admin_create_', true);
         $type = (string) ($suggestion['type'] ?? 'unknown');
         $data = $suggestion['extracted_data'] ?? [];
+        
+        if (!$this->record) {
+            Log::error("[Admin Create Content] No record", [
+                'request_id' => $requestId,
+                'suggestion' => $suggestion,
+            ]);
+            throw new \RuntimeException('No classroom record available');
+        }
+        
         $classroomId = (int) $this->record->id;
+        $userId = auth()->id();
+        
+        if (!$userId) {
+            Log::error("[Admin Create Content] No user", [
+                'request_id' => $requestId,
+                'classroom_id' => $classroomId,
+                'suggestion' => $suggestion,
+            ]);
+            throw new \RuntimeException('No authenticated user available');
+        }
 
         Log::info("[Admin Create Content] Starting", [
             'request_id' => $requestId,
             'type' => $type,
             'classroom_id' => $classroomId,
+            'user_id' => $userId,
             'data_keys' => array_keys($data),
             'data' => $data,
         ]);
@@ -565,9 +585,14 @@ class EditClassroom extends EditRecord
                 ]);
 
                 try {
+                    $userId = auth()->id();
+                    if (!$userId) {
+                        throw new \RuntimeException('No authenticated user available');
+                    }
+                    
                     $announcementData = [
                         'classroom_id' => $classroomId,
-                        'user_id' => auth()->id(),
+                        'user_id' => $userId,
                         'type' => $announcementType,
                         'title' => $title,
                         'content' => (string) ($item['content'] ?? $item['description'] ?? ''),
@@ -602,6 +627,7 @@ class EditClassroom extends EditRecord
                             'type' => $announcementType,
                             'title' => $title,
                             'date_data' => $dateData,
+                            'item' => $item,
                         ],
                     ]);
                     throw $e;
