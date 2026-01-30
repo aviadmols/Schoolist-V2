@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    @vite(['resources/js/app.js'])
+    {{-- Builder screens (classroom etc.) are server-rendered + inline template JS; no Vue/Inertia bundle needed - improves LCP and avoids app.js errors --}}
     @if ($themeCssUrl = builder_theme_css_url())
       <link rel="stylesheet" href="{{ $themeCssUrl }}">
     @endif
@@ -55,12 +55,19 @@
       </script>
     @endif
     <script>
-      window.addEventListener('load', function () {
+      (function () {
         var screen = document.querySelector('[data-loading-screen]');
         if (!screen) return;
-        screen.classList.add('is-hidden');
-        setTimeout(function () { screen.remove(); }, 250);
-      });
+        function hideLoader() {
+          screen.classList.add('is-hidden');
+          setTimeout(function () { screen.remove(); }, 250);
+        }
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', function () { setTimeout(hideLoader, 120); });
+        } else {
+          setTimeout(hideLoader, 50);
+        }
+      })();
     </script>
   </body>
 </html>

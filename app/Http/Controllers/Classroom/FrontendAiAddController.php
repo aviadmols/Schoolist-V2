@@ -127,7 +127,9 @@ class FrontendAiAddController extends Controller
             ], 500);
         }
 
-        $prompt = $this->buildPrompt($setting->content_analyzer_prompt, $text, $classroom);
+        $targetDate = $request->input('target_date');
+        $targetDayName = $request->input('target_day_name');
+        $prompt = $this->buildPrompt($setting->content_analyzer_prompt, $text, $classroom, $targetDate, $targetDayName);
         
         Log::info("[AI Analyze] Prompt built", [
             'request_id' => $requestId,
@@ -354,7 +356,7 @@ class FrontendAiAddController extends Controller
         }
     }
 
-    private function buildPrompt($basePrompt, $text, $classroom)
+    private function buildPrompt($basePrompt, $text, $classroom, ?string $targetDate = null, ?string $targetDayName = null)
     {
         $now = Carbon::now($classroom->timezone);
         $hebrewDays = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
@@ -370,7 +372,13 @@ class FrontendAiAddController extends Controller
         $prompt .= "Time: ".$now->format('H:i')."\n";
         $prompt .= "Day of week: ".$now->format('l')." (".['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'][$now->dayOfWeek].")\n";
         $prompt .= "Use this context to calculate future dates when needed.";
-        
+
+        if ($targetDate !== null && $targetDate !== '' && $targetDayName !== null && $targetDayName !== '') {
+            $prompt .= "\n\nTARGET_DAY_FOR_CONTENT:\n";
+            $prompt .= "The user is adding content for: ".$targetDayName." (".$targetDate.").\n";
+            $prompt .= "When creating announcements, events, or homework, use occurs_on_date = ".$targetDate." (Y-m-d) unless the user specifies another date.";
+        }
+
         if ($text !== '') {
             $prompt .= "\n\nINPUT_TEXT:\n".$text;
         }
@@ -465,7 +473,7 @@ class FrontendAiAddController extends Controller
                 $title = $item['title'] ?? $item['name'] ?? 'ללא כותרת';
                 $content = $item['content'] ?? $item['description'] ?? '';
                 $dateValue = $item['occurs_on_date'] ?? $item['date'] ?? $item['due_date'] ?? null;
-                $parsedDate = $this->parseDate($dateValue);
+                $parsedDate = $this->parseDate($dateValue, $classroom->timezone);
                 $timeValue = $item['occurs_at_time'] ?? $item['time'] ?? null;
                 
                 Log::info("[Frontend Create Announcements] Creating item", [
@@ -594,7 +602,7 @@ class FrontendAiAddController extends Controller
             $child = Child::create([
                 'classroom_id' => $classroom->id,
                 'name' => $data['child_name'] ?? '',
-                'birth_date' => $this->parseDate($data['child_birth_date'] ?? null),
+                'birth_date' => $this->parseDate($data['child_birth_date'] ?? null, $classroom->timezone),
             ]);
 
             Log::info("[Frontend Create Child Contact Page] Child created", [
@@ -630,11 +638,35 @@ class FrontendAiAddController extends Controller
         }
     }
 
-    private function parseDate($value)
+    private function parseDate($value, ?string $timezone = null)
     {
         if (!$value) return null;
+        $timezone = $timezone ?: 'Asia/Jerusalem';
         if (is_string($value)) {
             $value = trim($value);
+            $normalized = str_replace(['״', '"'], '', $value);
+            $normalized = preg_replace('/\s+/', ' ', $normalized);
+            $hebrewDays = [
+                'ראשון' => 0,
+                'שני' => 1,
+                'שלישי' => 2,
+                'רביעי' => 3,
+                'חמישי' => 4,
+                'שישי' => 5,
+                'שבת' => 6,
+            ];
+
+            foreach ($hebrewDays as $name => $dayIndex) {
+                if (str_contains($normalized, "יום {$name}") || str_contains($normalized, $name)) {
+                    $now = Carbon::now($timezone);
+                    $isNextWeek = str_contains($normalized, 'הבא');
+                    if (!$isNextWeek && $now->dayOfWeek === $dayIndex) {
+                        return $now->copy()->startOfDay()->format('Y-m-d');
+                    }
+                    return $now->copy()->next($dayIndex)->startOfDay()->format('Y-m-d');
+                }
+            }
+
             if (preg_match('/^\d{1,2}[\.\/]\d{1,2}[\.\/]\d{2,4}$/', $value)) {
                 try {
                     $parts = preg_split('/[\.\/]/', $value);
@@ -643,7 +675,7 @@ class FrontendAiAddController extends Controller
                     if ($yearLength === 2) {
                         $format = str_contains($value, '/') ? 'd/m/y' : 'd.m.y';
                     }
-                    $date = Carbon::createFromFormat($format, $value);
+                    $date = Carbon::createFromFormat($format, $value, $timezone);
                     return $date->format('Y-m-d');
                 } catch (\Exception $e) {
                     return null;
@@ -651,7 +683,7 @@ class FrontendAiAddController extends Controller
             }
         }
         try {
-            return Carbon::parse($value)->format('Y-m-d');
+            return Carbon::parse($value, $timezone)->format('Y-m-d');
         } catch (\Exception $e) {
             return null;
         }

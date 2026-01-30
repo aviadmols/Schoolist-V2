@@ -751,6 +751,7 @@ class TemplateManager
   </div>
 
   <div class="card card-stacked-top">
+  <h1>aaa</h1>
     <div class="card-header">
       <div class="card-title">
         יום <span id="selected-day-name">{{ ($page['day_names'] ?? ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'])[(int) ($page['selected_day'] ?? 0)] ?? '' }}</span>

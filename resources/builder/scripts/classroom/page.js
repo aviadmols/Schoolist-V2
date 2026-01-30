@@ -36,6 +36,7 @@
         let selectedFile = null;
         let aiSuggestionData = null;
         const classroomId = {{ ($page['classroom']['id'] ?? $classroom->id ?? null) ?: 'null' }};
+        const weekDates = {!! json_encode($page['week_dates'] ?? []) !!};
 
         // Open quick add popup
         if (quickAddTrigger && quickAddPopup) {
@@ -87,11 +88,16 @@
 
             try {
               const formData = new FormData();
-              // Always send content_text, even if empty (for validation)
               formData.append('content_text', text || '');
               if (selectedFile) {
                 formData.append('content_file', selectedFile);
               }
+              var activeTab = document.querySelector('.day-tab.active');
+              var dayIndex = activeTab ? parseInt(activeTab.getAttribute('data-day') || '0', 10) : 0;
+              var sendDate = Array.isArray(weekDates) && weekDates[dayIndex] ? weekDates[dayIndex] : '';
+              var sendDayName = (dayNames && dayNames[dayIndex]) ? dayNames[dayIndex] : '';
+              if (sendDate) formData.append('target_date', sendDate);
+              if (sendDayName) formData.append('target_day_name', sendDayName);
 
               console.log('[AI Quick Add] Sending request', {
                 hasText: !!text,
@@ -449,9 +455,9 @@
       };
 
       const setContentPopup = (dataset) => {
-        if (!dataset) return;
+        if (!dataset || typeof dataset !== 'object') return;
         try {
-          const type = dataset.itemType || 'message';
+          const type = (dataset.itemType != null ? dataset.itemType : '') || 'message';
           if (contentPopupType) {
             contentPopupType.textContent = typeLabels[type] || type;
           }
@@ -498,7 +504,7 @@
           }
           const target = document.getElementById(popupId);
           if (!target) {
-            console.warn('Popup not found:', popupId, 'Available popups:', Array.from(document.querySelectorAll('[data-popup]')).map(p => p.id));
+            console.warn('Popup not found:', popupId, 'Available popups:', Array.from(document.querySelectorAll('[data-popup]')).filter(Boolean).map(p => p.id));
             return;
           }
           if (popups && popups.length > 0) {
@@ -526,19 +532,18 @@
                 try {
                   event.preventDefault();
                   event.stopPropagation();
-                  const currentTarget = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+                  const currentTarget = event.currentTarget && event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
                   if (!currentTarget) return;
-                  // Safe dataset access
+                  const targetId = currentTarget.getAttribute('data-item-popup');
+                  if (!targetId) return;
                   let dataset = {};
                   try {
-                    if (currentTarget.dataset) {
+                    if (currentTarget.dataset != null && typeof currentTarget.dataset === 'object') {
                       dataset = currentTarget.dataset;
                     }
                   } catch (e) {
                     // Ignore
                   }
-                  const targetId = currentTarget.getAttribute('data-item-popup');
-                  if (!targetId) return;
                   setContentPopup(dataset);
                   openPopup(targetId);
                 } catch (err) {
@@ -599,6 +604,12 @@
 
       if (backdrop && typeof backdrop.addEventListener === 'function') {
         backdrop.addEventListener('click', closePopups);
+      }
+
+      // Close popup-children when clicking anywhere on the popup (not only on X/buttons)
+      const popupChildren = document.getElementById('popup-children');
+      if (popupChildren && typeof popupChildren.addEventListener === 'function') {
+        popupChildren.addEventListener('click', closePopups);
       }
 
       // Handle child contacts toggle

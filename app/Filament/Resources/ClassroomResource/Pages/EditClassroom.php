@@ -595,8 +595,9 @@ class EditClassroom extends EditRecord
             ]);
             
             foreach ($items as $index => $item) {
-                $dateValue = $item['date'] ?? $item['due_date'] ?? null;
+                $dateValue = $item['occurs_on_date'] ?? $item['date'] ?? $item['due_date'] ?? null;
                 $dateData = $this->normalizeDateValue($dateValue);
+                $timeValue = $item['occurs_at_time'] ?? $item['time'] ?? null;
                 $title = $this->computeAnnouncementTitle(
                     (string) ($item['title'] ?? $item['name'] ?? ''),
                     (string) ($item['content'] ?? $item['description'] ?? '')
@@ -608,7 +609,7 @@ class EditClassroom extends EditRecord
                     'title' => $title,
                     'date_value' => $dateValue,
                     'date_data' => $dateData,
-                    'time' => $item['time'] ?? null,
+                    'time' => $timeValue,
                     'location' => $item['location'] ?? null,
                 ]);
 
@@ -626,7 +627,7 @@ class EditClassroom extends EditRecord
                         'content' => (string) ($item['content'] ?? $item['description'] ?? ''),
                         'occurs_on_date' => $dateData['date'],
                         'day_of_week' => $dateData['day_of_week'],
-                        'occurs_at_time' => $this->normalizeTime($item['time'] ?? null),
+                        'occurs_at_time' => $this->normalizeTime($timeValue),
                         'location' => (string) ($item['location'] ?? ''),
                     ];
                     
