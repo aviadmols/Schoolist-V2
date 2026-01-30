@@ -50,6 +50,41 @@ class OpenRouterService
     }
 
     /**
+     * Check if a model is available for the token.
+     */
+    public function isModelAvailable(string $token, string $model): bool
+    {
+        $this->clearLastError();
+
+        try {
+            $response = $this->sendRequest($token, 'GET', self::BASE_URL.'/models');
+        } catch (\Throwable $exception) {
+            $this->lastError = $exception->getMessage();
+            return false;
+        }
+
+        if (!$response->ok()) {
+            $this->lastError = $this->buildErrorMessage($response);
+            return false;
+        }
+
+        $data = $response->json('data');
+        if (!is_array($data)) {
+            $this->lastError = 'OpenRouter models response invalid.';
+            return false;
+        }
+
+        foreach ($data as $item) {
+            if (($item['id'] ?? null) === $model) {
+                return true;
+            }
+        }
+
+        $this->lastError = 'Model not found: '.$model;
+        return false;
+    }
+
+    /**
      * Request a timetable extraction completion.
      *
      * @return string|null

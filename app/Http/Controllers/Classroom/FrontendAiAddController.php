@@ -15,11 +15,14 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Validator;
 
 class FrontendAiAddController extends Controller
 {
     private const AI_PROVIDER = 'openrouter';
     private const ANNOUNCEMENT_TITLE_MAX_LENGTH = 80;
+    private const MAX_IMAGE_BYTES_FOR_AI = 7000000;
+    private const CONTENT_ANALYZER_SUFFIX = "SCHEMA FIELDS:\n- announcements: title, content, occurs_on_date, occurs_at_time, location\n- contacts: first_name, last_name, role, phone, email\n- children: name, birth_date\n- child_contacts: name, relation, phone\n\nReturn JSON that matches the schema above.";
 
     public function analyze(Request $request, Classroom $classroom, OpenRouterService $service)
     {
@@ -72,6 +75,19 @@ class FrontendAiAddController extends Controller
             'file_size' => $file ? $file->getSize() : null,
             'file_mime' => $file ? $file->getMimeType() : null,
         ]);
+
+        if ($file && $file->getSize() && $file->getSize() > self::MAX_IMAGE_BYTES_FOR_AI) {
+            Log::warning("[AI Analyze] Image too large for safe processing", [
+                'request_id' => $requestId,
+                'file_size' => $file->getSize(),
+                'max_bytes' => self::MAX_IMAGE_BYTES_FOR_AI,
+            ]);
+            return response()->json([
+                'ok' => false,
+                'error' => 'הקובץ גדול מדי לעיבוד',
+                'details' => 'אנא העלה קובץ קטן יותר כדי למנוע חריגה מזיכרון'
+            ], 422);
+        }
 
         if ($text === '' && !$file) {
             Log::warning("[AI Analyze] Empty input", ['request_id' => $requestId]);
@@ -222,25 +238,40 @@ class FrontendAiAddController extends Controller
             'all_inputs' => array_keys($request->all()),
         ]);
 
-        try {
-            $request->validate([
-                'suggestion' => 'required|array',
-                'is_public' => 'required|boolean'
-            ]);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        $input = $request->all();
+        if (isset($input['suggestion']) && is_array($input['suggestion'])) {
+            $normalizedSuggestion = $input['suggestion'];
+            if (empty($normalizedSuggestion['extracted_data'])) {
+                if (isset($normalizedSuggestion['items']) && is_array($normalizedSuggestion['items'])) {
+                    $normalizedSuggestion['extracted_data'] = ['items' => $normalizedSuggestion['items']];
+                } elseif (isset($normalizedSuggestion['data']) && is_array($normalizedSuggestion['data'])) {
+                    $normalizedSuggestion['extracted_data'] = $normalizedSuggestion['data'];
+                }
+            }
+            $input['suggestion'] = $normalizedSuggestion;
+        }
+
+        $validator = Validator::make($input, [
+            'suggestion' => 'required|array',
+            'suggestion.type' => 'required|string|in:announcement,event,homework,contact,contact_page',
+            'suggestion.extracted_data' => 'required|array',
+            'is_public' => 'required|boolean',
+        ]);
+
+        if ($validator->fails()) {
             Log::error("[AI Store] Validation failed", [
                 'request_id' => $requestId,
-                'errors' => $e->errors(),
-                'input' => $request->all(),
+                'errors' => $validator->errors(),
+                'input' => $input,
             ]);
             return response()->json([
                 'ok' => false, 
-                'error' => 'שגיאת אימות: ' . implode(', ', array_map(fn($arr) => implode(', ', $arr), $e->errors()))
+                'error' => 'שגיאת אימות: ' . implode(', ', array_map(fn($arr) => implode(', ', $arr), $validator->errors()->toArray()))
             ], 422);
         }
 
-        $suggestion = $request->input('suggestion');
-        $isPublic = $request->input('is_public');
+        $suggestion = $input['suggestion'];
+        $isPublic = $input['is_public'];
         $user = auth()->user();
 
         Log::info("[AI Store] Input processed", [
@@ -268,8 +299,11 @@ class FrontendAiAddController extends Controller
         }
 
         try {
-            $type = (string) ($suggestion['type'] ?? 'unknown');
-            $data = $suggestion['extracted_data'] ?? [];
+            $type = (string) ($suggestion['type'] ?? $suggestion['content_type'] ?? 'unknown');
+            $data = $suggestion['extracted_data'] ?? $suggestion['data'] ?? [];
+            if (empty($data) && isset($suggestion['items']) && is_array($suggestion['items'])) {
+                $data = ['items' => $suggestion['items']];
+            }
             
             Log::info("[AI Store] Creating content", [
                 'request_id' => $requestId,
@@ -328,22 +362,64 @@ class FrontendAiAddController extends Controller
         $prompt .= "Date: ".$now->format('d.m.Y')."\n";
         $prompt .= "Time: ".$now->format('H:i')."\n";
         $prompt .= "Day of week: ".$now->format('l')." (".['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'][$now->dayOfWeek].")\n";
+        $prompt .= "Use this context to calculate future dates when needed.";
         
         if ($text !== '') {
             $prompt .= "\n\nINPUT_TEXT:\n".$text;
         }
 
-        $prompt .= "\n\nSCHEMA FIELDS:\n- announcements: title, content, occurs_on_date, occurs_at_time, location\n- contacts: first_name, last_name, role, phone, email\n- children: name, birth_date\n- child_contacts: name, relation, phone\n\nReturn JSON only.";
+        $prompt .= "\n\n".self::CONTENT_ANALYZER_SUFFIX;
+        $prompt .= "\n\nOUTPUT_RULES:\n- Return ONLY valid JSON.\n- No markdown, no code blocks, no explanations.";
 
         return $prompt;
     }
 
     private function parseResponse($response)
     {
-        preg_match('/\{.*\}/s', $response, $matches);
-        $json = $matches[0] ?? $response;
-        $payload = json_decode($json, true);
-        return $payload['suggestions'][0] ?? null;
+        if (!is_string($response) || trim($response) === '') {
+            return null;
+        }
+
+        $candidates = [];
+        $trimmed = trim($response);
+        $candidates[] = $trimmed;
+
+        if (preg_match('/```(?:json)?\s*(.*?)\s*```/s', $response, $codeMatch)) {
+            $candidates[] = trim($codeMatch[1]);
+        }
+
+        if (preg_match('/\{[\s\S]*\}/', $response, $objectMatch)) {
+            $candidates[] = trim($objectMatch[0]);
+        }
+
+        if (preg_match('/\[[\s\S]*\]/', $response, $arrayMatch)) {
+            $candidates[] = trim($arrayMatch[0]);
+        }
+
+        foreach ($candidates as $candidate) {
+            $payload = json_decode($candidate, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                continue;
+            }
+
+            if (isset($payload['suggestions']) && is_array($payload['suggestions'])) {
+                return $payload['suggestions'][0] ?? null;
+            }
+
+            if (isset($payload['suggestion']) && is_array($payload['suggestion'])) {
+                return $payload['suggestion'];
+            }
+
+            if (isset($payload['type']) && is_array($payload)) {
+                return $payload;
+            }
+
+            if (is_array($payload) && array_is_list($payload)) {
+                return $payload[0] ?? null;
+            }
+        }
+
+        return null;
     }
 
     private function createAnnouncements($classroom, $type, $data, $isPublic)
@@ -353,8 +429,10 @@ class FrontendAiAddController extends Controller
         
         // Handle both 'items' array and single item
         $items = [];
-        if (isset($data['items']) && is_array($data['items'])) {
-            $items = $data['items'];
+        if (isset($data['items'])) {
+            $items = is_array($data['items']) ? $data['items'] : [$data['items']];
+        } elseif (is_array($data) && array_is_list($data)) {
+            $items = $data;
         } elseif (!empty($data)) {
             $items = [$data];
         }
@@ -379,8 +457,9 @@ class FrontendAiAddController extends Controller
             try {
                 $title = $item['title'] ?? $item['name'] ?? 'ללא כותרת';
                 $content = $item['content'] ?? $item['description'] ?? '';
-                $dateValue = $item['date'] ?? $item['due_date'] ?? null;
+                $dateValue = $item['occurs_on_date'] ?? $item['date'] ?? $item['due_date'] ?? null;
                 $parsedDate = $this->parseDate($dateValue);
+                $timeValue = $item['occurs_at_time'] ?? $item['time'] ?? null;
                 
                 Log::info("[Frontend Create Announcements] Creating item", [
                     'request_id' => $requestId,
@@ -389,7 +468,7 @@ class FrontendAiAddController extends Controller
                     'has_content' => !empty($content),
                     'date_value' => $dateValue,
                     'parsed_date' => $parsedDate,
-                    'time' => $item['time'] ?? null,
+                    'time' => $timeValue,
                     'location' => $item['location'] ?? null,
                 ]);
                 
@@ -400,7 +479,7 @@ class FrontendAiAddController extends Controller
                     'title' => mb_substr($title, 0, self::ANNOUNCEMENT_TITLE_MAX_LENGTH),
                     'content' => $content,
                     'occurs_on_date' => $parsedDate,
-                    'occurs_at_time' => $item['time'] ?? null,
+                    'occurs_at_time' => $timeValue,
                     'location' => $item['location'] ?? null,
                 ];
                 
@@ -547,6 +626,23 @@ class FrontendAiAddController extends Controller
     private function parseDate($value)
     {
         if (!$value) return null;
+        if (is_string($value)) {
+            $value = trim($value);
+            if (preg_match('/^\d{1,2}[\.\/]\d{1,2}[\.\/]\d{2,4}$/', $value)) {
+                try {
+                    $parts = preg_split('/[\.\/]/', $value);
+                    $yearLength = strlen($parts[2] ?? '');
+                    $format = str_contains($value, '/') ? 'd/m/Y' : 'd.m.Y';
+                    if ($yearLength === 2) {
+                        $format = str_contains($value, '/') ? 'd/m/y' : 'd.m.y';
+                    }
+                    $date = Carbon::createFromFormat($format, $value);
+                    return $date->format('Y-m-d');
+                } catch (\Exception $e) {
+                    return null;
+                }
+            }
+        }
         try {
             return Carbon::parse($value)->format('Y-m-d');
         } catch (\Exception $e) {

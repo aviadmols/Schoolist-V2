@@ -1341,17 +1341,18 @@ class TemplateManager
                 try {
                   event.preventDefault();
                   event.stopPropagation();
-                  if (!trigger) return;
+                  const currentTarget = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+                  if (!currentTarget) return;
                   // Safe dataset access
                   let dataset = {};
                   try {
-                    if (trigger && trigger.dataset) {
-                      dataset = trigger.dataset;
+                    if (currentTarget.dataset) {
+                      dataset = currentTarget.dataset;
                     }
                   } catch (e) {
                     // Ignore
                   }
-                  const targetId = trigger.getAttribute('data-item-popup');
+                  const targetId = currentTarget.getAttribute('data-item-popup');
                   if (!targetId) return;
                   setContentPopup(dataset);
                   openPopup(targetId);

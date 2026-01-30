@@ -2,8 +2,7 @@
 
 namespace App\Services\Announcements;
 
-use Carbon\Carbon;
-use Illuminate\Support\Collection;
+use Carbon\CarbonImmutable;
 
 class AnnouncementWindowService
 {
@@ -12,7 +11,7 @@ class AnnouncementWindowService
 
     /**
      * Compute visibility window for an announcement.
-     * Returns ['from' => Carbon, 'until' => Carbon]
+     * Returns ['from' => CarbonImmutable, 'until' => CarbonImmutable]
      *
      * @param string|null $occursOnDate
      * @param string|null $endDate
@@ -24,8 +23,8 @@ class AnnouncementWindowService
     public function getVisibilityWindow(?string $occursOnDate, ?string $endDate, bool $alwaysShow, ?int $dayOfWeek, string $timezone): array
     {
         if ($alwaysShow) {
-            $from = Carbon::now($timezone)->subYears(10);
-            $until = Carbon::now($timezone)->addYears(10);
+            $from = CarbonImmutable::now($timezone)->subYears(10);
+            $until = CarbonImmutable::now($timezone)->addYears(10);
 
             return [
                 'from' => $from,
@@ -35,11 +34,11 @@ class AnnouncementWindowService
 
         $targetDate = $this->resolveTargetDate($occursOnDate, $dayOfWeek, $timezone);
 
-        $from = $targetDate->copy()->subDay()->setTime(self::WINDOW_START_HOUR, 0, 0);
-        $until = $targetDate->copy()->setTime(self::WINDOW_START_HOUR, 0, 0);
+        $from = $targetDate->subDay()->setTime(self::WINDOW_START_HOUR, 0, 0);
+        $until = $targetDate->setTime(self::WINDOW_START_HOUR, 0, 0);
 
         if ($endDate) {
-            $until = Carbon::parse($endDate, $timezone)->endOfDay();
+            $until = CarbonImmutable::parse($endDate, $timezone)->endOfDay();
         }
 
         return [
@@ -56,14 +55,14 @@ class AnnouncementWindowService
      * @param string $timezone
      * @return Carbon
      */
-    private function resolveTargetDate(?string $occursOnDate, ?int $dayOfWeek, string $timezone): Carbon
+    private function resolveTargetDate(?string $occursOnDate, ?int $dayOfWeek, string $timezone): CarbonImmutable
     {
         if ($occursOnDate) {
-            return Carbon::parse($occursOnDate, $timezone);
+            return CarbonImmutable::parse($occursOnDate, $timezone);
         }
 
         if ($dayOfWeek !== null) {
-            $now = Carbon::now($timezone);
+            $now = CarbonImmutable::now($timezone);
             // Get next occurrence of this day of week
             if ($now->dayOfWeek === $dayOfWeek && $now->hour < self::WINDOW_START_HOUR) {
                 return $now->startOfDay();
@@ -71,6 +70,6 @@ class AnnouncementWindowService
             return $now->next($dayOfWeek)->startOfDay();
         }
 
-        return Carbon::today($timezone);
+        return CarbonImmutable::today($timezone);
     }
 }
