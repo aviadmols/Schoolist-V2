@@ -245,8 +245,14 @@ class EditClassroom extends EditRecord
         }
 
         if (!$this->aiSuggestion) {
+            Log::warning("[Admin AI Store] No suggestion available", [
+                'classroom_id' => $this->record?->id,
+                'session_key' => $this->getAiSuggestionSessionKey(),
+                'session_has_data' => session()->has($this->getAiSuggestionSessionKey()),
+            ]);
             Notification::make()
                 ->title('No suggestion available')
+                ->body('לא נמצאה הצעה זמינה. אנא הרץ את ה-AI Quick Add שוב.')
                 ->danger()
                 ->send();
             return;
@@ -279,17 +285,30 @@ class EditClassroom extends EditRecord
             ]);
         } catch (\Throwable $exception) {
             $totalDuration = microtime(true) - $startTime;
+            $errorMessage = $exception->getMessage();
+            $errorClass = get_class($exception);
+            
             Log::error("[Admin AI Store] Failed", [
                 'request_id' => $requestId,
                 'classroom_id' => $this->record?->id,
                 'duration_seconds' => round($totalDuration, 2),
-                'error' => $exception->getMessage(),
+                'error' => $errorMessage,
+                'error_class' => $errorClass,
                 'trace' => $exception->getTraceAsString(),
                 'suggestion' => $this->aiSuggestion,
             ]);
+            
+            // Build detailed error message
+            $notificationBody = 'שגיאה ביצירת התוכן';
+            if ($errorMessage) {
+                $notificationBody .= ': ' . $errorMessage;
+            }
+            $notificationBody .= "\n\nRequest ID: " . $requestId;
+            $notificationBody .= "\nאנא בדוק את הלוגים לפרטים נוספים.";
+            
             Notification::make()
                 ->title('Unable to create content')
-                ->body('Check logs for details. Request ID: ' . $requestId)
+                ->body($notificationBody)
                 ->danger()
                 ->send();
             return;
@@ -416,10 +435,12 @@ class EditClassroom extends EditRecord
                 NotificationAction::make('confirm')
                     ->label('Confirm & Create')
                     ->button()
-                    ->dispatchSelf('confirm-ai-suggestion'),
+                    ->dispatchSelf('confirm-ai-suggestion')
+                    ->close(),
                 NotificationAction::make('retry')
                     ->label('Retry')
-                    ->dispatchSelf('retry-ai-suggestion'),
+                    ->dispatchSelf('retry-ai-suggestion')
+                    ->close(),
             ])
             ->persistent()
             ->send();

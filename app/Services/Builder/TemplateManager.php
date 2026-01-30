@@ -931,11 +931,13 @@ class TemplateManager
 
               console.log('[AI Quick Add] Response status', response.status);
 
+              // Read response text once - can only be called once
+              const responseText = await response.text();
+              console.log('[AI Quick Add] Raw response text', responseText.substring(0, 500));
+
               if (!response.ok) {
                 let errorData = {};
-                let responseText = '';
                 try {
-                  responseText = await response.text();
                   errorData = JSON.parse(responseText);
                 } catch (e) {
                   // If JSON parsing fails, use the text as error
@@ -946,35 +948,39 @@ class TemplateManager
                   status: response.status,
                   statusText: response.statusText,
                   errorData: errorData,
-                  responseText: responseText
+                  responseText: responseText.substring(0, 1000)
                 });
                 
                 // Build detailed error message
                 let errorMessage = errorData.error || errorData.message || `שגיאה ${response.status}: ${response.statusText}`;
+                let errorDetails = '';
+                
+                if (errorData.details) {
+                  errorDetails = '\n\nפרטים נוספים:\n' + errorData.details;
+                }
+                
                 if (errorData.errors) {
                   const errorsList = Object.entries(errorData.errors)
                     .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
                     .join(' | ');
-                  errorMessage += ' | ' + errorsList;
+                  errorDetails += '\n\nשגיאות אימות:\n' + errorsList;
                 }
+                
                 if (response.status === 500 && !errorData.error) {
                   errorMessage += ' | שגיאת שרת פנימית - אנא נסה שוב או פנה לתמיכה';
                 }
                 
-                throw new Error(errorMessage);
+                throw new Error(errorMessage + errorDetails);
               }
 
               let result;
               try {
-                const responseText = await response.text();
-                console.log('[AI Quick Add] Raw response text', responseText);
                 result = JSON.parse(responseText);
                 console.log('[AI Quick Add] Response data', result);
               } catch (jsonError) {
                 console.error('[AI Quick Add] Failed to parse JSON response', jsonError);
-                const text = await response.text().catch(() => 'לא ניתן לקרוא את התגובה');
-                console.error('[AI Quick Add] Response text', text);
-                throw new Error('תגובה לא תקינה מהשרת: ' + (text.substring(0, 200) || jsonError.message));
+                console.error('[AI Quick Add] Response text', responseText.substring(0, 500));
+                throw new Error('תגובה לא תקינה מהשרת: ' + (responseText.substring(0, 200) || jsonError.message));
               }
               
               // Check if response is ok
@@ -1050,8 +1056,14 @@ class TemplateManager
               
               if (error instanceof Error) {
                 errorMessage = error.message || error.toString();
-                if (error.stack) {
-                  errorDetails = '\n\nפרטים טכניים:\n' + error.stack.split('\n').slice(0, 3).join('\n');
+                // Extract details from error message if it contains newlines
+                if (errorMessage.includes('\n\nפרטים נוספים:')) {
+                  const parts = errorMessage.split('\n\nפרטים נוספים:');
+                  errorMessage = parts[0];
+                  errorDetails = '\n\nפרטים נוספים:' + parts[1];
+                }
+                if (error.stack && !errorDetails) {
+                  errorDetails = '\n\nפרטים טכניים:\n' + error.stack.split('\n').slice(0, 5).join('\n');
                 }
               } else if (typeof error === 'string') {
                 errorMessage = error;
@@ -1061,11 +1073,14 @@ class TemplateManager
                 errorMessage = JSON.stringify(error).substring(0, 500);
               }
               
-              // Build full error message
+              // Build full error message with clear formatting
               let fullErrorMessage = errorMessage;
               if (errorDetails) {
                 fullErrorMessage += errorDetails;
               }
+              
+              // Show error in alert with better formatting
+              console.error('[AI Quick Add] Full error message:', fullErrorMessage);
               
               // Don't duplicate "שגיאה בניתוח" prefix if it's already in the message
               if (fullErrorMessage.includes('שגיאה בניתוח')) {
