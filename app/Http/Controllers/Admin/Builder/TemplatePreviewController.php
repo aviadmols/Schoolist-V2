@@ -32,7 +32,7 @@ class TemplatePreviewController
         $mockData = $this->getMockData($template);
         $user = $this->getPreviewUser($request);
         $pageData = $template->key === 'classroom.page'
-            ? $this->getClassroomPageData($request, $timetableService, $announcementService, $holidayService)
+            ? $this->getClassroomPageData($request, $user, $timetableService, $announcementService, $holidayService)
             : [];
 
         $data = array_merge([
@@ -81,6 +81,7 @@ class TemplatePreviewController
      */
     private function getClassroomPageData(
         Request $request,
+        ?User $user,
         TimetableService $timetableService,
         AnnouncementFeedService $announcementService,
         HolidayService $holidayService
