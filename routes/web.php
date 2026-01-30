@@ -267,7 +267,6 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
                 'school_name' => $classroom->school?->name,
                 'allow_member_posting' => $classroom->allow_member_posting,
             ],
-            'selected_day' => $selectedDay,
             'day_labels' => $dayLabels,
             'day_names' => $dayNames,
             'timetable' => $timetableService->getWeeklyTimetable($classroom),
