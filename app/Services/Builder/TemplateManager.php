@@ -1601,6 +1601,15 @@ HTML;
     {
         $id = $this->getPopupIdFromKey($key);
         $body = $this->getPopupBodyHtml($key);
+        $shouldHideActions = $key === $this->resolvePopupKey('content');
+        $actions = $shouldHideActions
+            ? ''
+            : <<<HTML
+    <div class="sb-modal-actions">
+      <button type="button" class="sb-button is-ghost" data-popup-close>סגור</button>
+      <button type="button" class="sb-button" data-popup-close>סיום</button>
+    </div>
+HTML;
 
         return <<<HTML
 <div id="{$id}" class="sb-popup" data-popup>
@@ -1609,10 +1618,7 @@ HTML;
     <div class="sb-modal-body">
       {$body}
     </div>
-    <div class="sb-modal-actions">
-      <button type="button" class="sb-button is-ghost" data-popup-close>סגור</button>
-      <button type="button" class="sb-button" data-popup-close>סיום</button>
-    </div>
+{$actions}
   </div>
 </div>
 HTML;

@@ -357,7 +357,14 @@ class FrontendAiAddController extends Controller
     private function buildPrompt($basePrompt, $text, $classroom)
     {
         $now = Carbon::now($classroom->timezone);
+        $hebrewDays = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+        $dayName = $hebrewDays[$now->dayOfWeek] ?? '';
         $prompt = trim($basePrompt);
+        $prompt = str_replace(
+            ['{$currentDate}', '{$dayName}', '{$tomorrow}'],
+            [$now->format('Y-m-d'), $dayName, $now->copy()->addDay()->format('Y-m-d')],
+            $prompt
+        );
         $prompt .= "\n\nCURRENT_DATE_AND_TIME:\n";
         $prompt .= "Date: ".$now->format('d.m.Y')."\n";
         $prompt .= "Time: ".$now->format('H:i')."\n";
