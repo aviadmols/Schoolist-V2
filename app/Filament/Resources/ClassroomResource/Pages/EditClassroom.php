@@ -416,10 +416,10 @@ class EditClassroom extends EditRecord
                 NotificationAction::make('confirm')
                     ->label('Confirm & Create')
                     ->button()
-                    ->dispatch('confirm-ai-suggestion'),
+                    ->dispatchSelf('confirm-ai-suggestion'),
                 NotificationAction::make('retry')
                     ->label('Retry')
-                    ->dispatch('retry-ai-suggestion'),
+                    ->dispatchSelf('retry-ai-suggestion'),
             ])
             ->persistent()
             ->send();
