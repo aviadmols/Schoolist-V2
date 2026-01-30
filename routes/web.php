@@ -158,7 +158,8 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
     $weekStart = $today->copy()->startOfWeek();
     $weekEnd = $today->copy()->endOfWeek();
 
-    $pageData = Cache::remember("classroom.page.data.{$classroom->id}.{$selectedDay}", 300, function () use ($classroom, $selectedDay, $today, $timetableService, $announcementService, $weatherService, $greeting, $dayLabels, $dayNames, $formatDate, $formatTime, $mapHolidays, $weekStart, $weekEnd, $holidays) {
+    // Cache key without selectedDay since it doesn't affect the data, only display
+    $pageData = Cache::remember("classroom.page.data.{$classroom->id}", 300, function () use ($classroom, $today, $timetableService, $announcementService, $weatherService, $greeting, $dayLabels, $dayNames, $formatDate, $formatTime, $mapHolidays, $weekStart, $weekEnd, $holidays) {
         // Get all announcements once and filter by type
         $allAnnouncements = $announcementService->getActiveFeed($classroom);
         
@@ -341,11 +342,14 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
         ];
     });
 
-    // Add user-specific data after cache
+    // Add user-specific data after cache (not cached since it's user-specific)
     $pageData['current_user'] = $user ? ['id' => $user->id, 'name' => $user->name, 'phone' => $user->phone] : null;
     $pageData['can_manage'] = $canManage;
     $pageData['admin_edit_url'] = $canManage ? url("/admin/classrooms/{$classroom->id}/edit") : null;
+    $pageData['selected_day'] = $selectedDay; // Add selected day after cache
 
+    // Render template - this is expensive but necessary for dynamic content
+    // Note: TemplateRenderer has its own internal caching for resolved HTML
     $overrideParts = app(TemplateRenderer::class)->renderPublishedPartsByKey('classroom.page', [
         'user' => auth()->user(),
         'classroom' => $classroom,

@@ -13,7 +13,7 @@ class TemplateRenderer
     private const CACHE_KEY_PREFIX = 'builder.template.resolved.';
 
     /** @var int */
-    private const CACHE_TTL_SECONDS = 60;
+    private const CACHE_TTL_SECONDS = 300; // 5 minutes - increased for better performance
 
     /** @var array<string, BuilderTemplate|null> */
     private static array $templateCache = [];
