@@ -73,7 +73,7 @@ class ClassroomController extends Controller
     public function join(Request $request): RedirectResponse
     {
         $request->validate([
-            'join_code' => ['required', 'string', 'size:10'],
+            'join_code' => ['required', 'string', 'size:4'],
         ]);
 
         $classroom = $this->classroomService->joinWithCode($request->user(), $request->join_code);

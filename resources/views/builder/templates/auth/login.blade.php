@@ -1,3 +1,10 @@
+<style>
+  .sb-digit-wrap { display: flex; flex-direction: column; gap: 0.5rem; }
+  .sb-digit-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .sb-digit { width: 2.25rem; height: 2.5rem; text-align: center; font-size: 1.125rem; font-weight: 600; border: 2px solid #e2e8f0; border-radius: 8px; background: #fff; }
+  .sb-digit:focus { outline: none; border-color: #2563eb; }
+  .sb-digit-sep { padding-bottom: 0.25rem; font-weight: 600; color: #64748b; }
+</style>
 <div class="sb-login-page">
   <div class="sb-login-card">
     <h1 class="sb-login-title">בואו נתחבר</h1>
@@ -8,7 +15,22 @@
       <div id="sb-step-phone" class="sb-login-step">
         <label class="sb-login-field">
           טלפון
-          <input type="tel" name="phone" id="sb-login-phone" class="sb-login-input" placeholder="0500000000" autocomplete="tel" required maxlength="10" pattern="[0-9]{10}">
+          <div class="sb-digit-wrap" dir="ltr">
+            <div class="sb-digit-row" id="sb-phone-container">
+              <input type="text" maxlength="1" class="sb-digit" data-phone-idx="0" inputmode="numeric" autocomplete="tel">
+              <input type="text" maxlength="1" class="sb-digit" data-phone-idx="1" inputmode="numeric">
+              <input type="text" maxlength="1" class="sb-digit" data-phone-idx="2" inputmode="numeric">
+              <span class="sb-digit-sep">-</span>
+              <input type="text" maxlength="1" class="sb-digit" data-phone-idx="3" inputmode="numeric">
+              <input type="text" maxlength="1" class="sb-digit" data-phone-idx="4" inputmode="numeric">
+              <input type="text" maxlength="1" class="sb-digit" data-phone-idx="5" inputmode="numeric">
+              <input type="text" maxlength="1" class="sb-digit" data-phone-idx="6" inputmode="numeric">
+              <input type="text" maxlength="1" class="sb-digit" data-phone-idx="7" inputmode="numeric">
+              <input type="text" maxlength="1" class="sb-digit" data-phone-idx="8" inputmode="numeric">
+              <input type="text" maxlength="1" class="sb-digit" data-phone-idx="9" inputmode="numeric">
+            </div>
+            <input type="hidden" name="phone" id="sb-login-phone" value="">
+          </div>
         </label>
         <p id="sb-login-error" class="sb-login-error" style="display: none;"></p>
         <button type="submit" class="sb-login-button" id="sb-login-submit">שלח קוד אימות</button>
@@ -17,7 +39,15 @@
       <div id="sb-step-code" class="sb-login-step" style="display: none;">
         <label class="sb-login-field">
           קוד אימות
-          <input type="text" name="code" id="sb-login-code" class="sb-login-input" placeholder="1234" autocomplete="one-time-code" maxlength="4" pattern="[0-9]{4}">
+          <div class="sb-digit-wrap" dir="ltr">
+            <div class="sb-digit-row" id="sb-code-container">
+              <input type="text" maxlength="1" class="sb-digit" data-code-idx="0" inputmode="numeric" autocomplete="one-time-code">
+              <input type="text" maxlength="1" class="sb-digit" data-code-idx="1" inputmode="numeric">
+              <input type="text" maxlength="1" class="sb-digit" data-code-idx="2" inputmode="numeric">
+              <input type="text" maxlength="1" class="sb-digit" data-code-idx="3" inputmode="numeric">
+            </div>
+            <input type="hidden" name="code" id="sb-login-code" value="">
+          </div>
         </label>
         <p id="sb-login-error-code" class="sb-login-error" style="display: none;"></p>
         <button type="submit" class="sb-login-button" id="sb-login-verify">אימות קוד</button>
@@ -75,9 +105,61 @@
     });
   }
 
+  function syncPhoneHidden() {
+    if (!phoneInput) return;
+    var digits = stepPhone.querySelectorAll('.sb-digit[data-phone-idx]');
+    var arr = [];
+    for (var i = 0; i < digits.length; i++) { arr.push((digits[i].value || '').replace(/\D/g, '').slice(0, 1)); }
+    phoneInput.value = arr.join('');
+  }
+
+  function syncCodeHidden() {
+    if (!codeInput) return;
+    var digits = stepCode.querySelectorAll('.sb-digit[data-code-idx]');
+    var arr = [];
+    for (var i = 0; i < digits.length; i++) { arr.push((digits[i].value || '').replace(/\D/g, '').slice(0, 1)); }
+    codeInput.value = arr.join('');
+  }
+
+  function bindDigitInputs(container, attr, hiddenSync) {
+    var inputs = container.querySelectorAll('.sb-digit[' + attr + ']');
+    for (var i = 0; i < inputs.length; i++) {
+      (function (idx, inp) {
+        inp.addEventListener('input', function () {
+          var v = (inp.value || '').replace(/\D/g, '').slice(0, 1);
+          inp.value = v;
+          hiddenSync();
+          if (v && inputs[idx + 1]) inputs[idx + 1].focus();
+        });
+        inp.addEventListener('keydown', function (e) {
+          if (e.key === 'Backspace' && !inp.value && inputs[idx - 1]) inputs[idx - 1].focus();
+        });
+        inp.addEventListener('paste', function (e) {
+          e.preventDefault();
+          var text = (e.clipboardData || window.clipboardData).getData('text') || '';
+          var nums = text.replace(/\D/g, '').slice(0, inputs.length - idx);
+          for (var j = 0; j < nums.length; j++) {
+            var k = idx + j;
+            if (inputs[k]) { inputs[k].value = nums[j]; }
+          }
+          hiddenSync();
+          var nextIdx = Math.min(idx + nums.length, inputs.length) - 1;
+          if (inputs[nextIdx]) inputs[nextIdx].focus();
+        });
+      })(i, inputs[i]);
+    }
+  }
+
+  var phoneContainer = document.getElementById('sb-phone-container');
+  var codeContainer = document.getElementById('sb-code-container');
+  if (phoneContainer) bindDigitInputs(phoneContainer, 'data-phone-idx', syncPhoneHidden);
+  if (codeContainer) bindDigitInputs(codeContainer, 'data-code-idx', syncCodeHidden);
+
   if (form) {
     form.addEventListener('submit', function (e) {
       e.preventDefault();
+      syncPhoneHidden();
+      syncCodeHidden();
       var step = document.getElementById('sb-login-step').value;
       var phone = (phoneInput && phoneInput.value) ? phoneInput.value.replace(/\D/g, '').slice(0, 10) : '';
 
@@ -104,7 +186,8 @@
             if (res.ok) {
               document.getElementById('sb-login-step').value = 'code';
               setStep('code');
-              if (codeInput) codeInput.focus();
+              var firstCode = stepCode.querySelector('.sb-digit[data-code-idx="0"]');
+              if (firstCode) firstCode.focus();
             } else {
               var msg = (res.data && res.data.errors && res.data.errors.phone) ? (Array.isArray(res.data.errors.phone) ? res.data.errors.phone[0] : res.data.errors.phone) : (res.data && res.data.message) ? (Array.isArray(res.data.message) ? res.data.message[0] : res.data.message) : 'שגיאה בשליחת הקוד.';
               showError(errorEl, msg);

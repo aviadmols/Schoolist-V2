@@ -56,20 +56,32 @@ Route::middleware('auth')->group(function () {
         Route::get('/create', [\App\Http\Controllers\Classroom\ClassroomController::class, 'create'])->name('classroom.create');
         Route::post('/', [\App\Http\Controllers\Classroom\ClassroomController::class, 'store'])->name('classroom.store');
         Route::post('/join', \App\Http\Controllers\Classroom\JoinClassroomController::class)->name('classroom.join');
-        Route::post('/{classroom}/switch', [\App\Http\Controllers\Classroom\ClassroomController::class, 'switch'])->name('classroom.switch');
-        
+        Route::post('/{classroom}/switch', [\App\Http\Controllers\Classroom\ClassroomController::class, 'switch'])
+            ->middleware('classroom.access')
+            ->name('classroom.switch');
+
         // Link Claiming
         Route::get('/claim', [\App\Http\Controllers\Classroom\LinkClaimController::class, 'view'])->name('classroom.claim.view');
         Route::post('/claim', [\App\Http\Controllers\Classroom\LinkClaimController::class, 'claim'])->name('classroom.claim');
 
-        // Membership management
-        Route::post('/{classroom}/members/{user}/role', [\App\Http\Controllers\Classroom\MembershipController::class, 'updateRole'])->name('classroom.membership.update');
-        Route::delete('/{classroom}/members/{user}', [\App\Http\Controllers\Classroom\MembershipController::class, 'remove'])->name('classroom.membership.remove');
+        // Membership management (only members can access)
+        Route::post('/{classroom}/members/{user}/role', [\App\Http\Controllers\Classroom\MembershipController::class, 'updateRole'])
+            ->middleware('classroom.access')
+            ->name('classroom.membership.update');
+        Route::delete('/{classroom}/members/{user}', [\App\Http\Controllers\Classroom\MembershipController::class, 'remove'])
+            ->middleware('classroom.access')
+            ->name('classroom.membership.remove');
 
-        // File management
-        Route::post('/{classroom}/files', [\App\Http\Controllers\Classroom\FileController::class, 'upload'])->name('classroom.files.upload');
-        Route::get('/{classroom}/files/{file}/download', [\App\Http\Controllers\Classroom\FileController::class, 'download'])->name('classroom.files.download');
-        Route::delete('/{classroom}/files/{file}', [\App\Http\Controllers\Classroom\FileController::class, 'destroy'])->name('classroom.files.destroy');
+        // File management (only members can access)
+        Route::post('/{classroom}/files', [\App\Http\Controllers\Classroom\FileController::class, 'upload'])
+            ->middleware('classroom.access')
+            ->name('classroom.files.upload');
+        Route::get('/{classroom}/files/{file}/download', [\App\Http\Controllers\Classroom\FileController::class, 'download'])
+            ->middleware('classroom.access')
+            ->name('classroom.files.download');
+        Route::delete('/{classroom}/files/{file}', [\App\Http\Controllers\Classroom\FileController::class, 'destroy'])
+            ->middleware('classroom.access')
+            ->name('classroom.files.destroy');
 
         // Useful Links
         Route::get('/links', [\App\Http\Controllers\Classroom\LinkController::class, 'index'])->name('classroom.links.index');

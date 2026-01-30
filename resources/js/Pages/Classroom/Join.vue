@@ -2,12 +2,12 @@
   <div class="stack">
     <div class="stack">
       <h1 class="text-title">Join Classroom</h1>
-      <p class="text-muted">Enter the 10-digit join code provided by your teacher.</p>
+      <p class="text-muted">Enter the 4-digit join code provided by your teacher.</p>
     </div>
 
     <form class="stack" @submit.prevent="submit">
       <UiField label="Join Code" :help="form.errors.join_code">
-        <UiInput v-model="form.join_code" placeholder="10-digit code" maxlength="10" />
+        <DigitInput v-model="form.join_code" :length="4" />
       </UiField>
 
       <div class="flex gap-4">
@@ -25,7 +25,7 @@ import { useForm } from '@inertiajs/vue3';
 import AppLayout from '../../layouts/AppLayout.vue';
 import UiButton from '../../components/ui/UiButton.vue';
 import UiField from '../../components/ui/UiField.vue';
-import UiInput from '../../components/ui/UiInput.vue';
+import DigitInput from '../../components/ui/DigitInput.vue';
 
 defineOptions({ layout: AppLayout });
 

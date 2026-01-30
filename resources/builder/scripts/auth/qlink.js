@@ -37,8 +37,10 @@
       event.preventDefault();
       errorEl.style.display = 'none';
 
-      const phone = root.querySelector('input[name="phone"]').value;
-      const code = root.querySelector('input[name="code"]').value;
+      const phoneInput = root.querySelector('input[name="phone"]');
+      const codeInput = root.querySelector('input[name="code"]');
+      const phone = phoneInput ? phoneInput.value.replace(/\D/g, '').slice(0, 10) : '';
+      const code = codeInput ? codeInput.value.replace(/\D/g, '').slice(0, 4) : '';
 
       try {
         if (step === 'phone') {
@@ -46,6 +48,8 @@
           step = 'code';
           codeField.style.display = 'grid';
           submitButton.textContent = 'Verify code';
+          const firstCode = root.querySelector('.sb-qlink-digit[data-qlink-code-idx="0"]');
+          if (firstCode) firstCode.focus();
           return;
         }
 

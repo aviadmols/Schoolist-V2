@@ -32,12 +32,12 @@ class Classroom extends Model
     }
 
     /**
-     * Generate a unique 10-digit join code.
+     * Generate a unique 4-digit join code.
      */
     protected static function generateUniqueJoinCode(): string
     {
         do {
-            $code = (string) rand(1000000000, 9999999999);
+            $code = (string) rand(1000, 9999);
         } while (static::where('join_code', $code)->exists());
 
         return $code;

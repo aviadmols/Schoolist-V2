@@ -23,7 +23,7 @@ class JoinClassroomController extends Controller
     public function __invoke(Request $request)
     {
         $request->validate([
-            'join_code' => ['required', 'string', 'size:10'],
+            'join_code' => ['required', 'string', 'size:4'],
         ]);
 
         $user = auth()->user();

@@ -7,8 +7,8 @@
           <slot />
         </div>
       </UiCard>
-    </div>
-    <footer class="page-auth__footer">
+
+          <footer class="page-auth__footer">
       <div class="page-auth__logo">schoolist</div>
       <p class="page-auth__copyright">
         © {{ new Date().getFullYear() }} כל הזכויות שמורות סקוליסט בע"מ
@@ -17,6 +17,8 @@
         </span>
       </p>
     </footer>
+    </div>
+
   </div>
 </template>
 

@@ -44,6 +44,7 @@ class TemplateRenderer
 
     /**
      * Render a published template by key as HTML/CSS/JS parts.
+     * For classroom.page we always use the default design from TemplateManager (file/code), not DB.
      *
      * @return array{html: string, css: string|null, js: string|null}|null
      */
@@ -51,7 +52,34 @@ class TemplateRenderer
     {
         $template = $this->getGlobalTemplateByKey($key);
 
-        if (!$template || !$template->is_override_enabled || !$this->hasPublishedContent($template)) {
+        if (!$template || !$template->is_override_enabled) {
+            return null;
+        }
+
+        // classroom.page: always use default design from TemplateManager (bundled file), never DB.
+        // Cache resolved parts (tokens replaced) to avoid loading 11 popup templates from DB on every request.
+        if ($key === 'classroom.page') {
+            $defaultHtml = app(TemplateManager::class)->getDefaultScreenHtml('classroom.page');
+            if ($defaultHtml === '') {
+                return null;
+            }
+            $contentHash = hash('sha256', $defaultHtml);
+            $resolvedCacheKey = self::CACHE_KEY_PREFIX.'classroom.page.resolved.'.$contentHash;
+            $parts = Cache::remember($resolvedCacheKey, self::CACHE_TTL_SECONDS, function () use ($defaultHtml) {
+                $parts = $this->splitTemplateParts($defaultHtml);
+                $parts['html'] = $this->resolveIncludeTokens($parts['html'], 0);
+
+                return $parts;
+            });
+            $parts = $this->ensureClassroomTabs($template, $parts);
+            if (!$this->isTemplateSafe($parts['html'], $parts['css'], $parts['js'])) {
+                return null;
+            }
+
+            return $this->renderTemplateParts($parts, $data);
+        }
+
+        if (!$this->hasPublishedContent($template)) {
             return null;
         }
 

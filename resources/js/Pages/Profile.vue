@@ -51,11 +51,9 @@
         <div v-if="joinSuccess" class="text-success text-sm">{{ joinSuccess }}</div>
         
         <UiField label="קוד כיתה">
-          <UiInput 
-            v-model="joinCode" 
-            type="text" 
-            placeholder="10 ספרות" 
-            maxlength="10"
+          <DigitInput
+            v-model="joinCode"
+            :length="4"
             :disabled="isJoining || isLocked"
           />
           <p v-if="attemptsRemaining !== null" class="text-muted text-xs">
@@ -69,7 +67,7 @@
         <UiButton 
           type="submit" 
           variant="primary" 
-          :disabled="isJoining || isLocked || !joinCode || joinCode.length !== 10"
+          :disabled="isJoining || isLocked || !joinCode || joinCode.length !== 4"
         >
           <span v-if="isJoining">מצטרף...</span>
           <span v-else>הוסף כיתה</span>
@@ -85,7 +83,7 @@ import { router } from '@inertiajs/vue3';
 import AppLayout from '../layouts/AppLayout.vue';
 import UiButton from '../components/ui/UiButton.vue';
 import UiField from '../components/ui/UiField.vue';
-import UiInput from '../components/ui/UiInput.vue';
+import DigitInput from '../components/ui/DigitInput.vue';
 
 /**
  * Profile page.

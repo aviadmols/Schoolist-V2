@@ -95,7 +95,8 @@
               var activeTab = document.querySelector('.day-tab.active');
               var dayIndex = activeTab ? parseInt(activeTab.getAttribute('data-day') || '0', 10) : 0;
               var sendDate = Array.isArray(weekDates) && weekDates[dayIndex] ? weekDates[dayIndex] : '';
-              var sendDayName = (dayNames && dayNames[dayIndex]) ? dayNames[dayIndex] : '';
+              var dayTabs = document.querySelectorAll('.day-tab');
+              var sendDayName = (dayTabs[dayIndex] && dayTabs[dayIndex].textContent) ? dayTabs[dayIndex].textContent.trim() : '';
               if (sendDate) formData.append('target_date', sendDate);
               if (sendDayName) formData.append('target_day_name', sendDayName);
 

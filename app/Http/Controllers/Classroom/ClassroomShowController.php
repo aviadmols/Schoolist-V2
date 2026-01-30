@@ -69,7 +69,6 @@ class ClassroomShowController extends Controller
         $announcementService = app(AnnouncementFeedService::class);
         $holidayService = app(HolidayService::class);
         $weatherService = app(WeatherService::class);
-        $holidays = $holidayService->getUpcomingHolidays($classroom);
         $dayLabels = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
         $dayNames = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
 
@@ -90,7 +89,7 @@ class ClassroomShowController extends Controller
         };
         $greeting = $getTimeBasedGreeting($today->hour);
 
-        $mapHolidays = function (Carbon $from, Carbon $to) use ($holidays): array {
+        $mapHolidays = function (Carbon $from, Carbon $to, $holidays): array {
             return $holidays
                 ->filter(function ($holiday) use ($from, $to) {
                     return $holiday->start_date && $holiday->start_date->between($from, $to);
@@ -128,6 +127,7 @@ class ClassroomShowController extends Controller
             $today,
             $timetableService,
             $announcementService,
+            $holidayService,
             $weatherService,
             $greeting,
             $dayLabels,
@@ -136,9 +136,9 @@ class ClassroomShowController extends Controller
             $formatTime,
             $mapHolidays,
             $weekStart,
-            $weekEnd,
-            $holidays
+            $weekEnd
         ) {
+            $holidays = $holidayService->getUpcomingHolidays($classroom);
             $allAnnouncements = $announcementService->getActiveFeed($classroom);
 
             $announcements = $allAnnouncements
@@ -247,8 +247,8 @@ class ClassroomShowController extends Controller
                 'timetable' => $timetableService->getWeeklyTimetable($classroom),
                 'announcements' => $announcements,
                 'events' => $events,
-                'events_today' => $mapHolidays($today, $today),
-                'events_week' => $mapHolidays($weekStart, $weekEnd),
+                'events_today' => $mapHolidays($today, $today, $holidays),
+                'events_week' => $mapHolidays($weekStart, $weekEnd, $holidays),
                 'links' => $classroom->links
                     ->sortBy('sort_order')
                     ->map(function (ClassLink $link): array {

@@ -1,3 +1,10 @@
+<style>
+  .sb-qlink-digit-wrap { display: flex; flex-direction: column; gap: 0.5rem; }
+  .sb-qlink-digit-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .sb-qlink-digit { width: 2.25rem; height: 2.5rem; text-align: center; font-size: 1.125rem; font-weight: 600; border: 2px solid #e2e8f0; border-radius: 8px; background: #fff; }
+  .sb-qlink-digit:focus { outline: none; border-color: #2563eb; }
+  .sb-qlink-digit-sep { padding-bottom: 0.25rem; font-weight: 600; color: #64748b; }
+</style>
 <div class="sb-qlink-page">
   <div class="sb-qlink-card" data-qlink-token="{{ $page['token'] ?? '' }}">
     <h1 class="sb-qlink-title">Enter your phone</h1>
@@ -6,14 +13,89 @@
       <div class="sb-qlink-error" data-qlink-error style="display: none;"></div>
       <label class="sb-qlink-field">
         Phone
-        <input type="text" name="phone" class="sb-qlink-input" placeholder="0500000000" autocomplete="tel">
+        <div class="sb-qlink-digit-wrap" dir="ltr">
+          <div class="sb-qlink-digit-row" id="sb-qlink-phone-container">
+            <input type="text" maxlength="1" class="sb-qlink-digit" data-qlink-phone-idx="0" inputmode="numeric" autocomplete="tel">
+            <input type="text" maxlength="1" class="sb-qlink-digit" data-qlink-phone-idx="1" inputmode="numeric">
+            <input type="text" maxlength="1" class="sb-qlink-digit" data-qlink-phone-idx="2" inputmode="numeric">
+            <span class="sb-qlink-digit-sep">-</span>
+            <input type="text" maxlength="1" class="sb-qlink-digit" data-qlink-phone-idx="3" inputmode="numeric">
+            <input type="text" maxlength="1" class="sb-qlink-digit" data-qlink-phone-idx="4" inputmode="numeric">
+            <input type="text" maxlength="1" class="sb-qlink-digit" data-qlink-phone-idx="5" inputmode="numeric">
+            <input type="text" maxlength="1" class="sb-qlink-digit" data-qlink-phone-idx="6" inputmode="numeric">
+            <input type="text" maxlength="1" class="sb-qlink-digit" data-qlink-phone-idx="7" inputmode="numeric">
+            <input type="text" maxlength="1" class="sb-qlink-digit" data-qlink-phone-idx="8" inputmode="numeric">
+            <input type="text" maxlength="1" class="sb-qlink-digit" data-qlink-phone-idx="9" inputmode="numeric">
+          </div>
+          <input type="hidden" name="phone" value="">
+        </div>
       </label>
       <label class="sb-qlink-field" data-qlink-code-field style="display: none;">
         Code
-        <input type="text" name="code" class="sb-qlink-input" placeholder="123456" autocomplete="one-time-code">
+        <div class="sb-qlink-digit-wrap" dir="ltr">
+          <div class="sb-qlink-digit-row" id="sb-qlink-code-container">
+            <input type="text" maxlength="1" class="sb-qlink-digit" data-qlink-code-idx="0" inputmode="numeric" autocomplete="one-time-code">
+            <input type="text" maxlength="1" class="sb-qlink-digit" data-qlink-code-idx="1" inputmode="numeric">
+            <input type="text" maxlength="1" class="sb-qlink-digit" data-qlink-code-idx="2" inputmode="numeric">
+            <input type="text" maxlength="1" class="sb-qlink-digit" data-qlink-code-idx="3" inputmode="numeric">
+          </div>
+          <input type="hidden" name="code" value="">
+        </div>
       </label>
       <button type="submit" class="sb-qlink-button">Send code</button>
       <div class="sb-qlink-note">By continuing you agree to receive an SMS for verification.</div>
     </form>
   </div>
 </div>
+<script>
+(function () {
+  var root = document.querySelector('[data-qlink-form]');
+  if (!root) return;
+  var phoneContainer = document.getElementById('sb-qlink-phone-container');
+  var codeContainer = document.getElementById('sb-qlink-code-container');
+  var phoneHidden = root.querySelector('input[name="phone"]');
+  var codeHidden = root.querySelector('input[name="code"]');
+
+  function syncPhone() {
+    if (!phoneHidden) return;
+    var inputs = phoneContainer.querySelectorAll('.sb-qlink-digit[data-qlink-phone-idx]');
+    var arr = [];
+    for (var i = 0; i < inputs.length; i++) arr.push((inputs[i].value || '').replace(/\D/g, '').slice(0, 1));
+    phoneHidden.value = arr.join('');
+  }
+  function syncCode() {
+    if (!codeHidden) return;
+    var inputs = codeContainer.querySelectorAll('.sb-qlink-digit[data-qlink-code-idx]');
+    var arr = [];
+    for (var i = 0; i < inputs.length; i++) arr.push((inputs[i].value || '').replace(/\D/g, '').slice(0, 1));
+    codeHidden.value = arr.join('');
+  }
+  function bindDigits(container, attr, sync) {
+    var inputs = container.querySelectorAll('.sb-qlink-digit[' + attr + ']');
+    for (var i = 0; i < inputs.length; i++) {
+      (function (idx, inp) {
+        inp.addEventListener('input', function () {
+          var v = (inp.value || '').replace(/\D/g, '').slice(0, 1);
+          inp.value = v;
+          sync();
+          if (v && inputs[idx + 1]) inputs[idx + 1].focus();
+        });
+        inp.addEventListener('keydown', function (e) {
+          if (e.key === 'Backspace' && !inp.value && inputs[idx - 1]) inputs[idx - 1].focus();
+        });
+        inp.addEventListener('paste', function (e) {
+          e.preventDefault();
+          var text = (e.clipboardData || window.clipboardData).getData('text') || '';
+          var nums = text.replace(/\D/g, '').slice(0, inputs.length - idx);
+          for (var j = 0; j < nums.length; j++) { if (inputs[idx + j]) inputs[idx + j].value = nums[j]; }
+          sync();
+          var nextIdx = Math.min(idx + nums.length, inputs.length) - 1;
+          if (inputs[nextIdx]) inputs[nextIdx].focus();
+        });
+      })(i, inputs[i]);
+    }
+  }
+  if (phoneContainer) bindDigits(phoneContainer, 'data-qlink-phone-idx', syncPhone);
+  if (codeContainer) bindDigits(codeContainer, 'data-qlink-code-idx', syncCode);
+})();
+</script>

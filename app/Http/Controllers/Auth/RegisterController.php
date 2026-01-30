@@ -21,7 +21,7 @@ class RegisterController
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'unique:users,email'],
-            'join_code' => ['nullable', 'string', 'size:10'],
+            'join_code' => ['nullable', 'string', 'size:4'],
         ]);
 
         // Ensure the phone was actually verified recently

@@ -127,8 +127,10 @@ class FrontendAiAddController extends Controller
             ], 500);
         }
 
-        $targetDate = $request->input('target_date');
-        $targetDayName = $request->input('target_day_name');
+        $now = Carbon::now($classroom->timezone);
+        $hebrewDays = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+        $targetDate = $request->input('target_date') ?: $now->format('Y-m-d');
+        $targetDayName = $request->input('target_day_name') ?: ($hebrewDays[$now->dayOfWeek] ?? '');
         $prompt = $this->buildPrompt($setting->content_analyzer_prompt, $text, $classroom, $targetDate, $targetDayName);
         
         Log::info("[AI Analyze] Prompt built", [
@@ -359,24 +361,27 @@ class FrontendAiAddController extends Controller
     private function buildPrompt($basePrompt, $text, $classroom, ?string $targetDate = null, ?string $targetDayName = null)
     {
         $now = Carbon::now($classroom->timezone);
-        $hebrewDays = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+        $hebrewDays = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
         $dayName = $hebrewDays[$now->dayOfWeek] ?? '';
+        $tomorrow = $now->copy()->addDay()->format('Y-m-d');
         $prompt = trim($basePrompt);
         $prompt = str_replace(
             ['{$currentDate}', '{$dayName}', '{$tomorrow}'],
-            [$now->format('Y-m-d'), $dayName, $now->copy()->addDay()->format('Y-m-d')],
+            [$now->format('Y-m-d'), $dayName, $tomorrow],
             $prompt
         );
-        $prompt .= "\n\nCURRENT_DATE_AND_TIME:\n";
-        $prompt .= "Date: ".$now->format('d.m.Y')."\n";
-        $prompt .= "Time: ".$now->format('H:i')."\n";
-        $prompt .= "Day of week: ".$now->format('l')." (".['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'][$now->dayOfWeek].")\n";
-        $prompt .= "Use this context to calculate future dates when needed.";
+        $prompt .= "\n\nCURRENT_DATE_AND_TIME (use this to resolve day names to actual dates):\n";
+        $prompt .= "Today's date (Y-m-d): ".$now->format('Y-m-d')."\n";
+        $prompt .= "Today's date (d.m.Y): ".$now->format('d.m.Y')."\n";
+        $prompt .= "Time now: ".$now->format('H:i')."\n";
+        $prompt .= "Day of week (Hebrew): ".$dayName." | Day of week (English): ".$now->format('l')."\n";
+        $prompt .= "Tomorrow (Y-m-d): ".$tomorrow."\n";
+        $prompt .= "CRITICAL: When the user writes a day name (e.g. יום חמישי, Thursday, חמישי), you MUST set occurs_on_date to the actual date in Y-m-d format (e.g. 2026-01-30). Never return only the day name in occurs_on_date or date fields.";
 
         if ($targetDate !== null && $targetDate !== '' && $targetDayName !== null && $targetDayName !== '') {
             $prompt .= "\n\nTARGET_DAY_FOR_CONTENT:\n";
-            $prompt .= "The user is adding content for: ".$targetDayName." (".$targetDate.").\n";
-            $prompt .= "When creating announcements, events, or homework, use occurs_on_date = ".$targetDate." (Y-m-d) unless the user specifies another date.";
+            $prompt .= "The user is adding content for: ".$targetDayName." (date: ".$targetDate.").\n";
+            $prompt .= "When creating announcements, events, or homework, use occurs_on_date = \"".$targetDate."\" (always Y-m-d format) unless the user explicitly specifies another date.";
         }
 
         if ($text !== '') {
@@ -384,7 +389,7 @@ class FrontendAiAddController extends Controller
         }
 
         $prompt .= "\n\n".self::CONTENT_ANALYZER_SUFFIX;
-        $prompt .= "\n\nOUTPUT_RULES:\n- Return ONLY valid JSON.\n- No markdown, no code blocks, no explanations.";
+        $prompt .= "\n\nOUTPUT_RULES:\n- Return ONLY valid JSON.\n- No markdown, no code blocks, no explanations.\n- occurs_on_date and date/due_date fields must always be in Y-m-d format (e.g. 2026-01-30), never a day name.";
 
         return $prompt;
     }

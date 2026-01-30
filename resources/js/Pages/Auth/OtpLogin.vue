@@ -9,7 +9,7 @@
       <div v-if="error" class="text-danger text-sm">{{ error }}</div>
 
       <UiField label="טלפון">
-        <UiInput v-model="phone" type="tel" placeholder="0500000000" />
+        <DigitInput v-model="phone" :length="10" :separator-after="2" autocomplete="tel" />
       </UiField>
 
       <UiField v-if="step === 'code'" label="קוד אימות">
@@ -26,8 +26,8 @@
         <UiField label="אימייל (לא חובה)">
           <UiInput v-model="email" type="email" />
         </UiField>
-        <UiField label="מספר כיתה (לא חובה)">
-          <UiInput v-model="joinCode" type="text" placeholder="10 ספרות" maxlength="10" />
+        <UiField label="קוד כיתה (לא חובה)">
+          <DigitInput v-model="joinCode" :length="4" />
           <p class="text-muted text-xs">אם יש לך קוד כיתה, הזינו אותו כאן</p>
         </UiField>
       </div>
@@ -46,6 +46,7 @@ import UiButton from '../../components/ui/UiButton.vue';
 import UiField from '../../components/ui/UiField.vue';
 import UiInput from '../../components/ui/UiInput.vue';
 import OtpInput from '../../components/ui/OtpInput.vue';
+import DigitInput from '../../components/ui/DigitInput.vue';
 
 /**
  * OTP login page.

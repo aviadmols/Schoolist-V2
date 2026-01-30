@@ -177,7 +177,7 @@ class QlinkController extends Controller
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'unique:users,email'],
-            'join_code' => ['nullable', 'string', 'size:10'],
+            'join_code' => ['nullable', 'string', 'size:4'],
             'qlink_token' => ['required', 'string'],
         ]);
 
@@ -232,7 +232,7 @@ class QlinkController extends Controller
     {
         $request->validate([
             'phone' => ['required', 'string', 'regex:/^[0-9]{10}$/'],
-            'join_code' => ['required', 'string', 'size:10'],
+            'join_code' => ['required', 'string', 'size:4'],
             'qlink_token' => ['required', 'string'],
         ]);
 
