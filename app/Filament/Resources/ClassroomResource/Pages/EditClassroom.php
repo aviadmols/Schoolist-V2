@@ -96,64 +96,78 @@ class EditClassroom extends EditRecord
      */
     protected function analyzeAiContent(array $data, OpenRouterService $service): void
     {
-        $text = trim((string) ($data['content_text'] ?? ''));
-        $file = $data['content_file'] ?? null;
+        try {
+            $text = trim((string) ($data['content_text'] ?? ''));
+            $file = $data['content_file'] ?? null;
 
-        if ($text === '' && !$file instanceof UploadedFile) {
+            if ($text === '' && !$file instanceof UploadedFile) {
+                Notification::make()
+                    ->title('Provide text or an image')
+                    ->danger()
+                    ->send();
+                return;
+            }
+
+            if ($text !== '') {
+                $file = null;
+            }
+
+            $setting = $this->getAiSetting();
+            if (!$setting || !$setting->token || !$setting->content_analyzer_model || !$setting->content_analyzer_prompt) {
+                Notification::make()
+                    ->title('OpenRouter settings are missing')
+                    ->danger()
+                    ->send();
+                return;
+            }
+
+            $prompt = $this->buildContentAnalyzerPrompt($setting->content_analyzer_prompt, $text);
+            [$imageMime, $imageBase64] = $this->resolveImagePayload($file);
+
+            $response = $service->requestContentAnalysis(
+                (string) $setting->token,
+                (string) $setting->content_analyzer_model,
+                $prompt,
+                $imageMime,
+                $imageBase64,
+                $this->record?->id
+            );
+
+            if (!$response) {
+                $error = $service->getLastError();
+                Notification::make()
+                    ->title('OpenRouter request failed')
+                    ->body($error ?: 'OpenRouter returned an empty response.')
+                    ->danger()
+                    ->send();
+                return;
+            }
+
+            $suggestion = $this->parseContentAnalyzerResponse($response);
+            if (!$suggestion) {
+                Notification::make()
+                    ->title('Unable to parse AI response')
+                    ->danger()
+                    ->send();
+                return;
+            }
+
+            $this->aiSuggestion = $suggestion;
+            session()->put($this->getAiSuggestionSessionKey(), $suggestion);
+            $this->showAiSuggestionNotification($suggestion);
+        } catch (\Throwable $exception) {
+            Log::error('AI quick add analysis failed', [
+                'classroom_id' => $this->record?->id,
+                'error' => $exception->getMessage(),
+                'trace' => $exception->getTraceAsString(),
+            ]);
+
             Notification::make()
-                ->title('Provide text or an image')
+                ->title('AI analysis failed')
+                ->body('An error occurred while processing your request. Please try again or check the logs for details.')
                 ->danger()
                 ->send();
-            return;
         }
-
-        if ($text !== '') {
-            $file = null;
-        }
-
-        $setting = $this->getAiSetting();
-        if (!$setting || !$setting->token || !$setting->content_analyzer_model || !$setting->content_analyzer_prompt) {
-            Notification::make()
-                ->title('OpenRouter settings are missing')
-                ->danger()
-                ->send();
-            return;
-        }
-
-        $prompt = $this->buildContentAnalyzerPrompt($setting->content_analyzer_prompt, $text);
-        [$imageMime, $imageBase64] = $this->resolveImagePayload($file);
-
-        $response = $service->requestContentAnalysis(
-            (string) $setting->token,
-            (string) $setting->content_analyzer_model,
-            $prompt,
-            $imageMime,
-            $imageBase64,
-            $this->record?->id
-        );
-
-        if (!$response) {
-            $error = $service->getLastError();
-            Notification::make()
-                ->title('OpenRouter request failed')
-                ->body($error ?: 'OpenRouter returned an empty response.')
-                ->danger()
-                ->send();
-            return;
-        }
-
-        $suggestion = $this->parseContentAnalyzerResponse($response);
-        if (!$suggestion) {
-            Notification::make()
-                ->title('Unable to parse AI response')
-                ->danger()
-                ->send();
-            return;
-        }
-
-        $this->aiSuggestion = $suggestion;
-        session()->put($this->getAiSuggestionSessionKey(), $suggestion);
-        $this->showAiSuggestionNotification($suggestion);
     }
 
     /**
@@ -261,13 +275,30 @@ class EditClassroom extends EditRecord
      */
     protected function parseContentAnalyzerResponse(string $responseText): ?array
     {
-        $json = $this->extractJson($responseText);
-        $payload = json_decode($json, true);
-        if (!is_array($payload) || empty($payload['suggestions'][0])) {
+        try {
+            $json = $this->extractJson($responseText);
+            $payload = json_decode($json, true);
+            
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                Log::warning('AI response JSON parsing failed', [
+                    'error' => json_last_error_msg(),
+                    'response_preview' => mb_substr($responseText, 0, 500),
+                ]);
+                return null;
+            }
+            
+            if (!is_array($payload) || empty($payload['suggestions'][0])) {
+                return null;
+            }
+
+            return $payload['suggestions'][0];
+        } catch (\Throwable $exception) {
+            Log::error('AI response parsing exception', [
+                'error' => $exception->getMessage(),
+                'response_preview' => mb_substr($responseText, 0, 500),
+            ]);
             return null;
         }
-
-        return $payload['suggestions'][0];
     }
 
     /**
