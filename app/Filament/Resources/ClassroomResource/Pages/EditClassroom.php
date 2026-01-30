@@ -441,14 +441,25 @@ class EditClassroom extends EditRecord
                     'phone' => $contact['phone'] ?? '',
                 ]);
 
-                ImportantContact::create([
-                    'classroom_id' => $classroomId,
-                    'first_name' => $firstName,
-                    'last_name' => $lastName,
-                    'role' => (string) ($contact['role'] ?? ''),
-                    'phone' => (string) ($contact['phone'] ?? ''),
-                    'email' => (string) ($contact['email'] ?? ''),
-                ]);
+                try {
+                    ImportantContact::create([
+                        'classroom_id' => $classroomId,
+                        'first_name' => $firstName,
+                        'last_name' => $lastName,
+                        'role' => (string) ($contact['role'] ?? ''),
+                        'phone' => (string) ($contact['phone'] ?? ''),
+                        'email' => (string) ($contact['email'] ?? ''),
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error("[Admin Create Content] Failed to create contact", [
+                        'request_id' => $requestId,
+                        'index' => $index,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                        'contact_data' => $contact,
+                    ]);
+                    throw $e;
+                }
             }
 
             Log::info("[Admin Create Content] Contacts created", ['request_id' => $requestId]);
@@ -464,11 +475,21 @@ class EditClassroom extends EditRecord
                 'parent2_name' => $data['parent2_name'] ?? null,
             ]);
             
-            $child = Child::create([
-                'classroom_id' => $classroomId,
-                'name' => (string) ($data['child_name'] ?? ''),
-                'birth_date' => $this->normalizeDate($data['child_birth_date'] ?? null),
-            ]);
+            try {
+                $child = Child::create([
+                    'classroom_id' => $classroomId,
+                    'name' => (string) ($data['child_name'] ?? ''),
+                    'birth_date' => $this->normalizeDate($data['child_birth_date'] ?? null),
+                ]);
+            } catch (\Exception $e) {
+                Log::error("[Admin Create Content] Failed to create child", [
+                    'request_id' => $requestId,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                    'child_data' => $data,
+                ]);
+                throw $e;
+            }
 
             Log::info("[Admin Create Content] Child created", [
                 'request_id' => $requestId,
@@ -511,23 +532,40 @@ class EditClassroom extends EditRecord
                     'location' => $item['location'] ?? null,
                 ]);
 
-                $announcement = Announcement::create([
-                    'classroom_id' => $classroomId,
-                    'user_id' => auth()->id(),
-                    'type' => $announcementType,
-                    'title' => $title,
-                    'content' => (string) ($item['content'] ?? $item['description'] ?? ''),
-                    'occurs_on_date' => $dateData['date'],
-                    'day_of_week' => $dateData['day_of_week'],
-                    'occurs_at_time' => $this->normalizeTime($item['time'] ?? null),
-                    'location' => (string) ($item['location'] ?? ''),
-                ]);
-                
-                Log::info("[Admin Create Content] Announcement created", [
-                    'request_id' => $requestId,
-                    'index' => $index,
-                    'announcement_id' => $announcement->id,
-                ]);
+                try {
+                    $announcement = Announcement::create([
+                        'classroom_id' => $classroomId,
+                        'user_id' => auth()->id(),
+                        'type' => $announcementType,
+                        'title' => $title,
+                        'content' => (string) ($item['content'] ?? $item['description'] ?? ''),
+                        'occurs_on_date' => $dateData['date'],
+                        'day_of_week' => $dateData['day_of_week'],
+                        'occurs_at_time' => $this->normalizeTime($item['time'] ?? null),
+                        'location' => (string) ($item['location'] ?? ''),
+                    ]);
+                    
+                    Log::info("[Admin Create Content] Announcement created", [
+                        'request_id' => $requestId,
+                        'index' => $index,
+                        'announcement_id' => $announcement->id,
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error("[Admin Create Content] Failed to create announcement", [
+                        'request_id' => $requestId,
+                        'index' => $index,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                        'data' => [
+                            'classroom_id' => $classroomId,
+                            'user_id' => auth()->id(),
+                            'type' => $announcementType,
+                            'title' => $title,
+                            'date_data' => $dateData,
+                        ],
+                    ]);
+                    throw $e;
+                }
             }
 
             Log::info("[Admin Create Content] Announcements created", [
@@ -537,7 +575,12 @@ class EditClassroom extends EditRecord
             return 'Announcements created';
         }
 
-        return 'No content created';
+        Log::error("[Admin Create Content] Unknown type", [
+            'request_id' => $requestId ?? 'unknown',
+            'type' => $type,
+            'suggestion' => $suggestion,
+        ]);
+        throw new \InvalidArgumentException("Unknown suggestion type: {$type}");
     }
 
     /**
@@ -631,13 +674,40 @@ class EditClassroom extends EditRecord
 
         $date = $this->normalizeDate($text);
         if ($date) {
-            return ['date' => $date, 'day_of_week' => null];
+            // Calculate day_of_week from date
+            try {
+                $carbonDate = Carbon::parse($date, $this->getClassroomTimezone());
+                $dayOfWeek = $carbonDate->dayOfWeek; // 0 (Sunday) to 6 (Saturday)
+                return ['date' => $date, 'day_of_week' => $dayOfWeek];
+            } catch (\Exception $e) {
+                Log::warning("[Admin Create Content] Failed to parse date for day_of_week", [
+                    'date' => $date,
+                    'error' => $e->getMessage(),
+                ]);
+                return ['date' => $date, 'day_of_week' => null];
+            }
         }
 
         $dayMatch = $this->extractHebrewDay($text);
         if ($dayMatch !== null) {
+            $resolvedDate = $this->resolveHebrewDayDate($dayMatch, $text);
+            if ($resolvedDate) {
+                try {
+                    $carbonDate = Carbon::parse($resolvedDate, $this->getClassroomTimezone());
+                    $dayOfWeek = $carbonDate->dayOfWeek;
+                    return [
+                        'date' => $resolvedDate,
+                        'day_of_week' => $dayOfWeek,
+                    ];
+                } catch (\Exception $e) {
+                    Log::warning("[Admin Create Content] Failed to parse resolved date for day_of_week", [
+                        'date' => $resolvedDate,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
             return [
-                'date' => $this->resolveHebrewDayDate($dayMatch, $text),
+                'date' => $resolvedDate,
                 'day_of_week' => null,
             ];
         }
