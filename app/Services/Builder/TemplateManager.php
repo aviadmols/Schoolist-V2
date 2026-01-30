@@ -902,20 +902,40 @@ class TemplateManager
 
             try {
               const formData = new FormData();
-              if (text) formData.append('content_text', text);
-              if (selectedFile) formData.append('content_file', selectedFile);
+              // Always send content_text, even if empty (for validation)
+              formData.append('content_text', text || '');
+              if (selectedFile) {
+                formData.append('content_file', selectedFile);
+              }
+
+              console.log('[AI Quick Add] Sending request', {
+                hasText: !!text,
+                textLength: text.length,
+                hasFile: !!selectedFile,
+                fileName: selectedFile?.name,
+                fileSize: selectedFile?.size,
+              });
+
+              const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+              if (!csrfToken) {
+                throw new Error('CSRF token לא נמצא');
+              }
 
               const response = await fetch(`/class/${classroomId}/ai-analyze`, {
                 method: 'POST',
                 headers: {
-                  'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                  'X-CSRF-TOKEN': csrfToken,
                 },
                 body: formData,
               });
 
+              console.log('[AI Quick Add] Response status', response.status);
+
               if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || errorData.message || 'שגיאה בניתוח');
+                console.error('[AI Quick Add] Error response', errorData);
+                const errorMessage = errorData.error || errorData.message || `שגיאה ${response.status}: ${response.statusText}`;
+                throw new Error(errorMessage);
               }
 
               const result = await response.json();

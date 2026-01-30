@@ -37,18 +37,28 @@ class FrontendAiAddController extends Controller
 
         try {
             $request->validate([
-                'content_text' => 'nullable|string',
+                'content_text' => 'nullable|string|max:10000',
                 'content_file' => 'nullable|image|max:10240', // 10MB
+            ], [
+                'content_file.image' => 'הקובץ חייב להיות תמונה',
+                'content_file.max' => 'גודל הקובץ לא יכול לעלות על 10MB',
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             Log::error("[AI Analyze] Validation failed", [
                 'request_id' => $requestId,
                 'errors' => $e->errors(),
                 'input' => $request->all(),
+                'has_content_text' => $request->has('content_text'),
+                'has_content_file' => $request->hasFile('content_file'),
+                'all_keys' => array_keys($request->all()),
             ]);
+            $errorMessages = [];
+            foreach ($e->errors() as $field => $messages) {
+                $errorMessages[] = $field . ': ' . implode(', ', $messages);
+            }
             return response()->json([
                 'ok' => false, 
-                'error' => 'שגיאת אימות: ' . implode(', ', array_map(fn($arr) => implode(', ', $arr), $e->errors()))
+                'error' => 'שגיאת אימות: ' . implode(' | ', $errorMessages)
             ], 422);
         }
 

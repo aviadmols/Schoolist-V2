@@ -364,8 +364,12 @@ Route::get('/class/{classroom}', function (\App\Models\Classroom $classroom) {
     return \Inertia\Inertia::render('Dashboard', $pageData);
 })->middleware(['auth', 'classroom.access'])->name('classroom.show');
 
-Route::post('/class/{classroom}/ai-analyze', [\App\Http\Controllers\Classroom\FrontendAiAddController::class, 'analyze'])->name('classroom.ai.analyze');
-Route::post('/class/{classroom}/ai-store', [\App\Http\Controllers\Classroom\FrontendAiAddController::class, 'store'])->name('classroom.ai.store');
+Route::post('/class/{classroom}/ai-analyze', [\App\Http\Controllers\Classroom\FrontendAiAddController::class, 'analyze'])
+    ->middleware(['auth', 'classroom.access'])
+    ->name('classroom.ai.analyze');
+Route::post('/class/{classroom}/ai-store', [\App\Http\Controllers\Classroom\FrontendAiAddController::class, 'store'])
+    ->middleware(['auth', 'classroom.access'])
+    ->name('classroom.ai.store');
 
 Route::middleware('auth')->group(function () {
     Route::get('/me', GetProfilePageController::class)->name('profile.show');
