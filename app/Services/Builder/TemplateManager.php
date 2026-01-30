@@ -938,11 +938,27 @@ class TemplateManager
                 throw new Error(errorMessage);
               }
 
-              const result = await response.json();
+              let result;
+              try {
+                result = await response.json();
+                console.log('[AI Quick Add] Response data', result);
+              } catch (jsonError) {
+                console.error('[AI Quick Add] Failed to parse JSON response', jsonError);
+                const text = await response.text();
+                console.error('[AI Quick Add] Response text', text);
+                throw new Error('תגובה לא תקינה מהשרת');
+              }
               
               // Check if response is ok
-              if (!result.ok || !result.suggestion) {
-                throw new Error(result.error || 'לא התקבלה הצעה מה-AI');
+              if (!result || result.ok === false) {
+                const errorMsg = result?.error || result?.message || 'לא התקבלה הצעה מה-AI';
+                console.error('[AI Quick Add] Response not ok', { result, errorMsg });
+                throw new Error(errorMsg);
+              }
+              
+              if (!result.suggestion) {
+                console.error('[AI Quick Add] No suggestion in response', result);
+                throw new Error('לא התקבלה הצעה מה-AI - התגובה לא מכילה הצעה');
               }
 
               const suggestion = result.suggestion;
@@ -984,8 +1000,23 @@ class TemplateManager
               }
 
             } catch (error) {
-              console.error('Error analyzing:', error);
-              alert('שגיאה בניתוח: ' + (error.message || 'שגיאה לא ידועה'));
+              console.error('[AI Quick Add] Error analyzing:', error);
+              let errorMessage = 'שגיאה לא ידועה';
+              
+              if (error instanceof Error) {
+                errorMessage = error.message;
+              } else if (typeof error === 'string') {
+                errorMessage = error;
+              } else if (error && error.message) {
+                errorMessage = error.message;
+              }
+              
+              // Don't duplicate "שגיאה בניתוח" prefix if it's already in the message
+              if (errorMessage.includes('שגיאה בניתוח')) {
+                alert(errorMessage);
+              } else {
+                alert('שגיאה בניתוח: ' + errorMessage);
+              }
             } finally {
               quickAddSubmit.disabled = false;
               quickAddSubmit.textContent = 'המשך';
