@@ -231,23 +231,16 @@ class TemplateManager
             [
                 'name' => $name,
                 'type' => $type,
-                'draft_html' => $parts['html'],
-                'draft_css' => $parts['css'],
-                'draft_js' => $parts['js'],
-                'published_html' => null,
-                'published_css' => null,
-                'published_js' => null,
+                'published_css' => $parts['css'],
                 'is_override_enabled' => false,
                 'created_by' => auth()->id(),
                 'updated_by' => auth()->id(),
             ]
         );
 
-        if (($this->shouldSeedTemplate($template) || $this->shouldReplaceTemplateDraft($template, $key)) && $defaultHtml) {
+        if (($this->shouldSeedTemplate($template) || $this->shouldReplaceTemplateDraft($template, $key)) && $parts['css']) {
             $template->update([
-                'draft_html' => $parts['html'],
-                'draft_css' => $parts['css'],
-                'draft_js' => $parts['js'],
+                'published_css' => $parts['css'],
                 'updated_by' => auth()->id(),
             ]);
         }
@@ -260,58 +253,329 @@ class TemplateManager
      */
     private function getDefaultHtmlForKey(string $key): string
     {
-        if ($key === 'classroom.page') {
-            return $this->getDefaultClassroomPageHtml();
+        return $this->getTemplateHtmlFromFile($key) ?? '';
+    }
+
+    /**
+     * Load template HTML from a Git-backed file.
+     */
+    private function getTemplateHtmlFromFile(string $key): ?string
+    {
+        $path = resource_path('views/builder/templates/'.str_replace('.', '/', $key).'.blade.php');
+        if (!is_file($path)) {
+            return null;
         }
 
-        if ($key === 'auth.login') {
-            return $this->getDefaultLoginPageHtml();
-        }
+        $contents = file_get_contents($path);
 
-        if ($key === 'auth.qlink') {
-            return $this->getDefaultQlinkPageHtml();
+        return $contents === false ? null : $contents;
+    }
+
+
+    /**
+     * Build the default popup HTML.
+     */
+    public function getDefaultPopupHtml(string $title, string $key): string
+    {
+        $fileHtml = $this->getTemplateHtmlFromFile($key);
+        if ($fileHtml !== null) {
+            return $fileHtml;
         }
 
         return '';
     }
 
     /**
-     * Build the default classroom page HTML.
+     * Resolve a popup key from a short key.
      */
-    public function getDefaultClassroomPageHtml(): string
+    private function resolvePopupKey(string $key): string
     {
-        return <<<'HTML'
-<style>
-  .sb-popup-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.55); opacity: 0; pointer-events: none; transition: opacity 200ms ease; z-index: 40; }
-  .sb-popup-backdrop.is-open { opacity: 1; pointer-events: auto; }
-  .sb-popup { position: fixed; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding: 16px; opacity: 0; pointer-events: none; transition: opacity 200ms ease; z-index: 50; }
-  .sb-popup.is-open { opacity: 1; pointer-events: auto; }
-  .sb-popup-card { width: 100%; max-width: 420px; background: #ffffff; border-radius: 24px 24px 0 0; padding: 20px; transform: translateY(40px); transition: transform 240ms ease; }
-  .sb-popup.is-open .sb-popup-card { transform: translateY(0); }
-  .logo-image { height: 20px; width: auto; display: block; }
+        $prefix = (string) config('builder.popup_prefix');
 
-  /* Quick Add Button */
-  .fixed-add-btn {
-    position: fixed;
-    bottom: 24px;
-    left: 24px;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: var(--blue-primary);
-    color: white;
-    border: none;
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    z-index: 30;
-    transition: transform 0.2s;
-  }
-  .fixed-add-btn:active { transform: scale(0.9); }
+        if (Str::startsWith($key, $prefix)) {
+            return $key;
+        }
 
-  /* Quick Add Card */
+        return $prefix.$key;
+    }
+
+    /**
+     * Build popup DOM id from a template key.
+     */
+    private function getPopupIdFromKey(string $key): string
+    {
+        $prefix = (string) config('builder.popup_prefix');
+        $shortKey = Str::after($key, $prefix);
+
+        return 'popup-'.Str::slug($shortKey);
+    }
+
+    /**
+     * Determine if a template should be seeded with defaults.
+     */
+    private function shouldSeedTemplate(BuilderTemplate $template): bool
+    {
+        return !$template->draft_html && !$template->draft_css && !$template->draft_js;
+    }
+
+    /**
+     * Determine if a template should be refreshed with new defaults.
+     */
+    private function shouldReplaceTemplateDraft(BuilderTemplate $template, string $key): bool
+    {
+        $draftHtml = (string) ($template->draft_html ?? '');
+
+        if (str_contains($draftHtml, 'This is a sample popup template')) {
+            return true;
+        }
+
+        if ($key === 'classroom.page' && str_contains($draftHtml, 'sb-page')) {
+            return true;
+        }
+
+        if ($key === 'auth.login' && $this->shouldSeedTemplate($template)) {
+            return true;
+        }
+
+        return false;
+    }
+
+
+    /**
+     * Split HTML into HTML/CSS/JS parts.
+     *
+     * @return array{html: string, css: string|null, js: string|null}
+     */
+    public function splitTemplateParts(string $html): array
+    {
+        $css = null;
+        $js = null;
+
+        preg_match_all('/<style\\b[^>]*>(.*?)<\\/style>/is', $html, $cssMatches);
+        if (!empty($cssMatches[1])) {
+            $css = trim(implode("\n\n", $cssMatches[1]));
+            $html = preg_replace('/<style\\b[^>]*>.*?<\\/style>/is', '', $html) ?? $html;
+        }
+
+        preg_match_all('/<script\\b[^>]*>(.*?)<\\/script>/is', $html, $jsMatches);
+        if (!empty($jsMatches[1])) {
+            $js = trim(implode("\n\n", $jsMatches[1]));
+            $html = preg_replace('/<script\\b[^>]*>.*?<\\/script>/is', '', $html) ?? $html;
+        }
+
+        return [
+            'html' => trim($html),
+            'css' => $css ?: null,
+            'js' => $js ?: null,
+        ];
+    }
+}
+
+    /**
+     * Build the default popup HTML.
+     */
+    public function getDefaultPopupHtml(string $title, string $key): string
+    {
+        $fileHtml = $this->getTemplateHtmlFromFile($key);
+        if ($fileHtml !== null) {
+            return $fileHtml;
+        }
+
+        return '';
+    }
+
+    /**
+     * Resolve a popup key from a short key.
+     */
+    private function resolvePopupKey(string $key): string
+    {
+        $prefix = (string) config('builder.popup_prefix');
+
+        if (Str::startsWith($key, $prefix)) {
+            return $key;
+        }
+
+        return $prefix.$key;
+    }
+
+    /**
+     * Build popup DOM id from a template key.
+     */
+    private function getPopupIdFromKey(string $key): string
+    {
+        $prefix = (string) config('builder.popup_prefix');
+        $shortKey = Str::after($key, $prefix);
+
+        return 'popup-'.Str::slug($shortKey);
+    }
+
+    /**
+     * Determine if a template should be seeded with defaults.
+     */
+    private function shouldSeedTemplate(BuilderTemplate $template): bool
+    {
+        return !$template->draft_html && !$template->draft_css && !$template->draft_js;
+    }
+
+    /**
+     * Determine if a template should be refreshed with new defaults.
+     */
+    private function shouldReplaceTemplateDraft(BuilderTemplate $template, string $key): bool
+    {
+        $draftHtml = (string) ($template->draft_html ?? '');
+
+        if (str_contains($draftHtml, 'This is a sample popup template')) {
+            return true;
+        }
+
+        if ($key === 'classroom.page' && str_contains($draftHtml, 'sb-page')) {
+            return true;
+        }
+
+        if ($key === 'auth.login' && $this->shouldSeedTemplate($template)) {
+            return true;
+        }
+
+        return false;
+    }
+}
+
+    /**
+     * Build the default popup HTML.
+     */
+    public function getDefaultPopupHtml(string $title, string $key): string
+    {
+        $fileHtml = $this->getTemplateHtmlFromFile($key);
+        if ($fileHtml !== null) {
+            return $fileHtml;
+        }
+
+        return '';
+    }
+
+    /**
+     * Resolve a popup key from a short key.
+     */
+    private function resolvePopupKey(string $key): string
+    {
+        $prefix = (string) config('builder.popup_prefix');
+
+        if (Str::startsWith($key, $prefix)) {
+            return $key;
+        }
+
+        return $prefix.$key;
+    }
+
+    /**
+     * Build popup DOM id from a template key.
+     */
+    private function getPopupIdFromKey(string $key): string
+    {
+        $prefix = (string) config('builder.popup_prefix');
+        $shortKey = Str::after($key, $prefix);
+
+        return 'popup-'.Str::slug($shortKey);
+    }
+
+    /**
+     * Determine if a template should be seeded with defaults.
+     */
+    private function shouldSeedTemplate(BuilderTemplate $template): bool
+    {
+        return !$template->draft_html && !$template->draft_css && !$template->draft_js;
+    }
+
+    /**
+     * Determine if a template should be refreshed with new defaults.
+     */
+    private function shouldReplaceTemplateDraft(BuilderTemplate $template, string $key): bool
+    {
+        $draftHtml = (string) ($template->draft_html ?? '');
+
+        if (str_contains($draftHtml, 'This is a sample popup template')) {
+            return true;
+        }
+
+        if ($key === 'classroom.page' && str_contains($draftHtml, 'sb-page')) {
+            return true;
+        }
+
+        if ($key === 'auth.login' && $this->shouldSeedTemplate($template)) {
+            return true;
+        }
+
+        return false;
+    }
+}
+
+    /**
+     * Build the default popup HTML.
+     */
+    public function getDefaultPopupHtml(string $title, string $key): string
+    {
+        $fileHtml = $this->getTemplateHtmlFromFile($key);
+        if ($fileHtml !== null) {
+            return $fileHtml;
+        }
+
+        return '';
+    }
+
+    /**
+     * Resolve a popup key from a short key.
+     */
+    private function resolvePopupKey(string $key): string
+    {
+        $prefix = (string) config('builder.popup_prefix');
+
+        if (Str::startsWith($key, $prefix)) {
+            return $key;
+        }
+
+        return $prefix.$key;
+    }
+
+    /**
+     * Build popup DOM id from a template key.
+     */
+    private function getPopupIdFromKey(string $key): string
+    {
+        $prefix = (string) config('builder.popup_prefix');
+        $shortKey = Str::after($key, $prefix);
+
+        return 'popup-'.Str::slug($shortKey);
+    }
+
+    /**
+     * Determine if a template should be seeded with defaults.
+     */
+    private function shouldSeedTemplate(BuilderTemplate $template): bool
+    {
+        return !$template->draft_html && !$template->draft_css && !$template->draft_js;
+    }
+
+    /**
+     * Determine if a template should be refreshed with new defaults.
+     */
+    private function shouldReplaceTemplateDraft(BuilderTemplate $template, string $key): bool
+    {
+        $draftHtml = (string) ($template->draft_html ?? '');
+
+        if (str_contains($draftHtml, 'This is a sample popup template')) {
+            return true;
+        }
+
+        if ($key === 'classroom.page' && str_contains($draftHtml, 'sb-page')) {
+            return true;
+        }
+
+        if ($key === 'auth.login' && $this->shouldSeedTemplate($template)) {
+            return true;
+        }
+
+        return false;
+    }
   .quick-add-card {
     border-radius: 24px !important;
     padding: 0 !important;
@@ -1599,29 +1863,12 @@ HTML;
      */
     public function getDefaultPopupHtml(string $title, string $key): string
     {
-        $id = $this->getPopupIdFromKey($key);
-        $body = $this->getPopupBodyHtml($key);
-        $shouldHideActions = $key === $this->resolvePopupKey('content');
-        $actions = $shouldHideActions
-            ? ''
-            : <<<HTML
-    <div class="sb-modal-actions">
-      <button type="button" class="sb-button is-ghost" data-popup-close>סגור</button>
-      <button type="button" class="sb-button" data-popup-close>סיום</button>
-    </div>
-HTML;
+        $fileHtml = $this->getTemplateHtmlFromFile($key);
+        if ($fileHtml !== null) {
+            return $fileHtml;
+        }
 
-        return <<<HTML
-<div id="{$id}" class="sb-popup" data-popup>
-  <div class="sb-popup-card">
-    <div class="sb-modal-title">{$title}</div>
-    <div class="sb-modal-body">
-      {$body}
-    </div>
-{$actions}
-  </div>
-</div>
-HTML;
+        return '';
     }
 
     /**
@@ -1679,425 +1926,6 @@ HTML;
         return false;
     }
 
-    /**
-     * Build the default login HTML.
-     */
-    private function getDefaultLoginPageHtml(): string
-    {
-        return <<<'HTML'
-<style>
-  .sb-login-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px 16px; background: #f8fafc; font-family: "Inter", Arial, sans-serif; }
-  .sb-login-card { width: 100%; max-width: 420px; background: #ffffff; border-radius: 20px; padding: 28px; box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12); }
-  .sb-login-title { font-size: 20px; font-weight: 700; margin: 0 0 6px; color: #0f172a; }
-  .sb-login-subtitle { font-size: 13px; color: #64748b; margin-bottom: 18px; }
-  .sb-login-stack { display: grid; gap: 12px; }
-  .sb-login-field { display: grid; gap: 6px; font-size: 12px; color: #475569; }
-  .sb-login-input { width: 100%; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; font-size: 14px; }
-  .sb-login-button { width: 100%; border: none; border-radius: 12px; background: #2563eb; color: #ffffff; padding: 12px; font-weight: 600; cursor: pointer; }
-  .sb-login-links { display: flex; justify-content: space-between; font-size: 12px; color: #64748b; margin-top: 10px; }
-  .sb-login-links a { color: inherit; text-decoration: none; }
-</style>
-<div class="sb-login-page">
-  <div class="sb-login-card">
-    <h1 class="sb-login-title">Welcome back</h1>
-    <p class="sb-login-subtitle">Sign in to manage your classroom updates.</p>
-    <form method="post" action="/login" class="sb-login-stack">
-      @csrf
-      <label class="sb-login-field">
-        Phone
-        <input type="text" name="phone" class="sb-login-input" placeholder="0500000000" autocomplete="tel">
-      </label>
-      <label class="sb-login-field">
-        Password
-        <input type="password" name="password" class="sb-login-input" placeholder="••••••••" autocomplete="current-password">
-      </label>
-      <button type="submit" class="sb-login-button">Sign in</button>
-    </form>
-    <div class="sb-login-links">
-      <a href="/auth/code">Use one-time code</a>
-      <a href="/">Back to site</a>
-    </div>
-  </div>
-</div>
-HTML;
-    }
-
-    /**
-     * Build the default qlink HTML.
-     */
-    private function getDefaultQlinkPageHtml(): string
-    {
-        return <<<'HTML'
-<style>
-  .sb-qlink-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px 16px; background: #f8fafc; font-family: "Inter", Arial, sans-serif; }
-  .sb-qlink-card { width: 100%; max-width: 420px; background: #ffffff; border-radius: 20px; padding: 28px; box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12); }
-  .sb-qlink-title { font-size: 20px; font-weight: 700; margin: 0 0 6px; color: #0f172a; }
-  .sb-qlink-subtitle { font-size: 13px; color: #64748b; margin-bottom: 18px; }
-  .sb-qlink-stack { display: grid; gap: 12px; }
-  .sb-qlink-field { display: grid; gap: 6px; font-size: 12px; color: #475569; }
-  .sb-qlink-input { width: 100%; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; font-size: 14px; }
-  .sb-qlink-button { width: 100%; border: none; border-radius: 12px; background: #2563eb; color: #ffffff; padding: 12px; font-weight: 600; cursor: pointer; }
-  .sb-qlink-note { font-size: 12px; color: #64748b; }
-  .sb-qlink-error { color: #b91c1c; font-size: 12px; }
-</style>
-<div class="sb-qlink-page">
-  <div class="sb-qlink-card" data-qlink-token="{{ $page['token'] ?? '' }}">
-    <h1 class="sb-qlink-title">Enter your phone</h1>
-    <p class="sb-qlink-subtitle">We will send a one-time code to continue.</p>
-    <form class="sb-qlink-stack" data-qlink-form>
-      <div class="sb-qlink-error" data-qlink-error style="display: none;"></div>
-      <label class="sb-qlink-field">
-        Phone
-        <input type="text" name="phone" class="sb-qlink-input" placeholder="0500000000" autocomplete="tel">
-      </label>
-      <label class="sb-qlink-field" data-qlink-code-field style="display: none;">
-        Code
-        <input type="text" name="code" class="sb-qlink-input" placeholder="123456" autocomplete="one-time-code">
-      </label>
-      <button type="submit" class="sb-qlink-button">Send code</button>
-      <div class="sb-qlink-note">By continuing you agree to receive an SMS for verification.</div>
-    </form>
-  </div>
-</div>
-<script>
-  (function () {
-    const root = document.querySelector('[data-qlink-form]');
-    if (!root) return;
-
-    const wrapper = document.querySelector('[data-qlink-token]');
-    const token = wrapper?.getAttribute('data-qlink-token') || '';
-    const errorEl = document.querySelector('[data-qlink-error]');
-    const codeField = document.querySelector('[data-qlink-code-field]');
-    const submitButton = root.querySelector('button[type="submit"]');
-    let step = 'phone';
-
-    const getCsrfToken = () => {
-      const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
-      return match ? decodeURIComponent(match[1]) : '';
-    };
-
-    const requestJson = async (url, payload) => {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': getCsrfToken(),
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw data;
-      }
-
-      return data;
-    };
-
-    root.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      errorEl.style.display = 'none';
-
-      const phone = root.querySelector('input[name="phone"]').value;
-      const code = root.querySelector('input[name="code"]').value;
-
-      try {
-        if (step === 'phone') {
-          await requestJson('/qlink/request', { phone, qlink_token: token });
-          step = 'code';
-          codeField.style.display = 'grid';
-          submitButton.textContent = 'Verify code';
-          return;
-        }
-
-        const data = await requestJson('/qlink/verify', { phone, code, qlink_token: token });
-        if (data.redirect_url) {
-          window.location.href = data.redirect_url;
-        }
-      } catch (err) {
-        const message = err?.message || err?.phone?.[0] || err?.code?.[0] || 'Request failed.';
-        errorEl.textContent = message;
-        errorEl.style.display = 'block';
-      }
-    });
-  })();
-</script>
-HTML;
-    }
-
-    /**
-     * Build popup body HTML by key.
-     */
-    public function getPopupBodyHtml(string $key): string
-    {
-        $shortKey = Str::after($key, (string) config('builder.popup_prefix'));
-
-        return match ($shortKey) {
-            'invite' => $this->getInvitePopupBodyHtml(),
-            'homework' => $this->getHomeworkPopupBodyHtml(),
-            'links' => $this->getLinksPopupBodyHtml(),
-            'whatsapp' => $this->getWhatsAppPopupBodyHtml(),
-            'important-links' => $this->getImportantLinksPopupBodyHtml(),
-            'holidays' => $this->getHolidaysPopupBodyHtml(),
-            'children' => $this->getChildrenPopupBodyHtml(),
-            'content' => $this->getContentPopupBodyHtml(),
-            'contacts' => $this->getContactsPopupBodyHtml(),
-            'food' => $this->getFoodPopupBodyHtml(),
-            'schedule' => $this->getSchedulePopupBodyHtml(),
-            default => '<p>Add your content here.</p>',
-        };
-    }
-
-    /**
-     * Build invite popup body HTML.
-     */
-    private function getInvitePopupBodyHtml(): string
-    {
-        return <<<'HTML'
-<p>Share this invite link with parents to join the classroom.</p>
-<div class="sb-list">
-  <div class="sb-row"><span>Invite Link</span><span>classroom.link/ABCD</span></div>
-  <div class="sb-row"><span>Expires</span><span>30 days</span></div>
-</div>
-HTML;
-    }
-
-    /**
-     * Build homework popup body HTML.
-     */
-    private function getHomeworkPopupBodyHtml(): string
-    {
-        return <<<'HTML'
-<p>Weekly assignments and reminders.</p>
-<div class="sb-list">
-  <div class="sb-row"><span>Math worksheet</span><span>Due Tue</span></div>
-  <div class="sb-row"><span>Reading pages 20-30</span><span>Due Wed</span></div>
-</div>
-HTML;
-    }
-
-    /**
-     * Build links popup body HTML.
-     */
-    private function getLinksPopupBodyHtml(): string
-    {
-        return <<<'HTML'
-<p>קישורים שימושיים לשיתוף.</p>
-<div class="sb-list">
-  <div class="sb-row"><span>קישור לכיתה</span><span>{{ $page['share_link'] ?? '' }}</span></div>
-</div>
-HTML;
-    }
-
-    /**
-     * Build WhatsApp links popup body HTML.
-     */
-    private function getWhatsAppPopupBodyHtml(): string
-    {
-        return <<<'HTML'
-<p>קישורי קבוצות וואטסאפ.</p>
-<div class="sb-list">
-  @if (!empty($page['links']))
-    @foreach ($page['links'] as $link)
-      @if (($link['category'] ?? '') === 'group_whatsapp')
-        <div class="sb-row">
-          <span>{{ $link['title'] ?? '' }}</span>
-          @if (!empty($link['link_url']))
-            <a href="{{ $link['link_url'] }}" target="_blank" rel="noopener">פתח</a>
-          @else
-            <span>-</span>
-          @endif
-        </div>
-      @endif
-    @endforeach
-  @else
-    <div class="sb-row"><span>אין קישורים זמינים</span><span></span></div>
-  @endif
-</div>
-HTML;
-    }
-
-    /**
-     * Build important links popup body HTML.
-     */
-    private function getImportantLinksPopupBodyHtml(): string
-    {
-        return <<<'HTML'
-<p>Links & Materials.</p>
-<div class="sb-list">
-  @if (!empty($page['links']))
-    @foreach ($page['links'] as $link)
-      @if (($link['category'] ?? '') === 'important_links')
-        <div class="sb-row">
-          <span>{{ $link['title'] ?? '' }}</span>
-          @if (!empty($link['link_url']))
-            <a href="{{ $link['link_url'] }}" target="_blank" rel="noopener">פתח</a>
-          @else
-            <span>-</span>
-          @endif
-        </div>
-      @endif
-    @endforeach
-  @else
-    <div class="sb-row"><span>אין קישורים זמינים</span><span></span></div>
-  @endif
-</div>
-HTML;
-    }
-
-    /**
-     * Build holidays popup body HTML.
-     */
-    private function getHolidaysPopupBodyHtml(): string
-    {
-        return <<<'HTML'
-<p>חופשות וחגים קרובים.</p>
-<div class="sb-list">
-  @if (!empty($page['holidays']))
-    @foreach ($page['holidays'] as $holiday)
-      <div class="sb-row">
-        <span>
-          {{ $holiday['name'] ?? '' }}
-          @if (!empty($holiday['has_kitan']) && $holiday['has_kitan'])
-            <span style="color: var(--blue-primary); margin-right: 4px;">🎒</span>
-          @endif
-        </span>
-        <span>
-          @if (!empty($holiday['start_date']))
-            {{ $holiday['start_date'] }}
-          @endif
-          @if (!empty($holiday['end_date']) && ($holiday['end_date'] ?? '') !== ($holiday['start_date'] ?? ''))
-            - {{ $holiday['end_date'] }}
-          @endif
-        </span>
-      </div>
-    @endforeach
-  @else
-    <div class="sb-row"><span>אין חופשות להצגה</span><span></span></div>
-  @endif
-</div>
-HTML;
-    }
-
-    /**
-     * Build children popup body HTML.
-     */
-    private function getChildrenPopupBodyHtml(): string
-    {
-        return <<<'HTML'
-<p>רשימת הילדים בכיתה.</p>
-<div class="sb-list" id="children-list">
-  @if (!empty($page['children']))
-    @foreach ($page['children'] as $child)
-      <div class="sb-row child-row" data-child-id="{{ $child['id'] ?? '' }}">
-        <span class="child-name" style="cursor: pointer; font-weight: bold;">{{ $child['name'] ?? '' }}</span>
-        <span>{{ $child['birth_date'] ?? '' }}</span>
-      </div>
-      <div class="child-contacts" data-child-id="{{ $child['id'] ?? '' }}" style="display: none; padding-right: 20px; margin-top: 8px;">
-        @if (!empty($child['contacts']))
-          @foreach ($child['contacts'] as $contact)
-            <div class="sb-row" style="font-size: 0.9em; color: #666;">
-              <span>{{ $contact['name'] ?? '' }} ({{ $contact['relation'] ?? '' }})</span>
-              <span>
-                @if (!empty($contact['phone']))
-                  <a href="tel:{{ $contact['phone'] }}" style="margin-left: 8px;">📞</a>
-                  <a href="https://wa.me/{{ str_replace(['+', '-', ' ', '(', ')'], '', $contact['phone']) }}" target="_blank" style="margin-left: 4px;">💬</a>
-                  <a href="tel:{{ $contact['phone'] }}?add" style="margin-left: 4px;">➕</a>
-                @endif
-              </span>
-            </div>
-          @endforeach
-        @endif
-      </div>
-    @endforeach
-  @else
-    <div class="sb-row"><span>אין ילדים להצגה</span><span></span></div>
-  @endif
-</div>
-HTML;
-    }
-
-    /**
-     * Build content popup body HTML.
-     */
-    private function getContentPopupBodyHtml(): string
-    {
-        return <<<'HTML'
-<div class="sb-list">
-  <div class="sb-row">
-    <span id="popup-content-type"></span>
-    <span id="popup-content-date"></span>
-  </div>
-  <div class="sb-row">
-    <strong id="popup-content-title"></strong>
-    <span id="popup-content-time"></span>
-  </div>
-  <div class="sb-row">
-    <span id="popup-content-location"></span>
-  </div>
-</div>
-<div id="popup-content-body" style="margin-top: 12px;"></div>
-HTML;
-    }
-
-    /**
-     * Build contacts popup body HTML.
-     */
-    private function getContactsPopupBodyHtml(): string
-    {
-        return <<<'HTML'
-<p>אנשי קשר חשובים.</p>
-<div class="sb-list">
-  @if (!empty($page['important_contacts']))
-    @foreach ($page['important_contacts'] as $contact)
-      <div class="sb-row">
-        <span>{{ $contact['name'] ?? '' }} @if (!empty($contact['role']))<span style="color: #666; font-size: 0.9em;">({{ $contact['role'] }})</span>@endif</span>
-        <span>
-          @if (!empty($contact['phone']))
-            <a href="tel:{{ $contact['phone'] }}" style="margin-left: 8px;">{{ $contact['phone'] }}</a>
-            <a href="https://wa.me/{{ str_replace(['+', '-', ' ', '(', ')'], '', $contact['phone']) }}" target="_blank" style="margin-left: 4px;">💬</a>
-            <a href="tel:{{ $contact['phone'] }}?add" style="margin-left: 4px;">➕</a>
-          @elseif (!empty($contact['email']))
-            <a href="mailto:{{ $contact['email'] }}">{{ $contact['email'] }}</a>
-          @endif
-        </span>
-      </div>
-    @endforeach
-  @else
-    <div class="sb-row"><span>אין אנשי קשר להצגה</span><span></span></div>
-  @endif
-</div>
-HTML;
-    }
-
-    /**
-     * Build food popup body HTML.
-     */
-    private function getFoodPopupBodyHtml(): string
-    {
-        return <<<'HTML'
-<p>This week's menu highlights.</p>
-<div class="sb-list">
-  <div class="sb-row"><span>Monday</span><span>Pasta</span></div>
-  <div class="sb-row"><span>Tuesday</span><span>Chicken salad</span></div>
-</div>
-HTML;
-    }
-
-    /**
-     * Build schedule popup body HTML.
-     */
-    private function getSchedulePopupBodyHtml(): string
-    {
-        return <<<'HTML'
-<p>Upcoming schedule changes.</p>
-<div class="sb-list">
-  <div class="sb-row"><span>Friday</span><span>Short day</span></div>
-  <div class="sb-row"><span>Next week</span><span>Field trip</span></div>
-</div>
-HTML;
-    }
 
     /**
      * Split HTML into HTML/CSS/JS parts.

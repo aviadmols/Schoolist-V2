@@ -112,7 +112,12 @@ class TemplateRenderer
      */
     private function getResolvedHtml(BuilderTemplate $template): string
     {
-        $hash = hash('sha256', ($template->published_html ?? '').'|'.($template->published_css ?? '').'|'.($template->published_js ?? ''));
+        $fileHtml = $this->getTemplateFileHtml($template->key) ?? '';
+        $fileJs = $this->getTemplateFileJs($template->key) ?? '';
+        $hash = hash(
+            'sha256',
+            $fileHtml.'|'.$fileJs.'|'.($template->published_html ?? '').'|'.($template->published_css ?? '').'|'.($template->published_js ?? '')
+        );
         $cacheKey = self::CACHE_KEY_PREFIX.$template->key.'.'.$hash;
 
         return Cache::remember($cacheKey, self::CACHE_TTL_SECONDS, function () use ($template) {
@@ -191,52 +196,12 @@ class TemplateRenderer
      */
     private function getDefaultPopupHtml(string $key): string
     {
-        $prefix = (string) config('builder.popup_prefix');
-        $shortKey = Str::after($key, $prefix);
-        $id = 'popup-'.Str::slug($shortKey);
-        
-        // Get title from config
-        $popups = (array) config('builder.default_popups', []);
-        $title = 'Popup';
-        foreach ($popups as $popup) {
-            if (($popup['key'] ?? '') === $shortKey) {
-                $title = (string) ($popup['title'] ?? $title);
-                break;
-            }
+        $fileHtml = $this->getTemplateFileHtml($key);
+        if ($fileHtml !== null) {
+            return $fileHtml;
         }
-        
-        // Get body HTML from TemplateManager
-        /** @var \App\Services\Builder\TemplateManager $templateManager */
-        $templateManager = app(\App\Services\Builder\TemplateManager::class);
-        $body = $this->getDefaultPopupBodyHtml($shortKey);
-        
-        return <<<HTML
-<div id="{$id}" class="sb-popup" data-popup>
-  <div class="sb-popup-card">
-    <div class="sb-modal-title">{$title}</div>
-    <div class="sb-modal-body">
-      {$body}
-    </div>
-    <div class="sb-modal-actions">
-      <button type="button" class="sb-button is-ghost" data-popup-close>סגור</button>
-      <button type="button" class="sb-button" data-popup-close>סיום</button>
-    </div>
-  </div>
-</div>
-HTML;
-    }
 
-    /**
-     * Get default popup body HTML by short key.
-     */
-    private function getDefaultPopupBodyHtml(string $shortKey): string
-    {
-        /** @var \App\Services\Builder\TemplateManager $templateManager */
-        $templateManager = app(\App\Services\Builder\TemplateManager::class);
-        $prefix = (string) config('builder.popup_prefix');
-        $fullKey = $prefix.$shortKey;
-        
-        return $templateManager->getPopupBodyHtml($fullKey);
+        return '';
     }
 
     /**
@@ -244,11 +209,46 @@ HTML;
      */
     private function getTemplateHtmlByVersion(BuilderTemplate $template, string $version): string
     {
+        $fileHtml = $this->getTemplateFileHtml($template->key);
+        if ($fileHtml !== null) {
+            return $fileHtml;
+        }
+
         if ($version === 'published') {
             return (string) ($template->published_html ?? '');
         }
 
         return (string) ($template->draft_html ?? '');
+    }
+
+    /**
+     * Load template HTML from a Git-backed file.
+     */
+    private function getTemplateFileHtml(string $key): ?string
+    {
+        $path = resource_path('views/builder/templates/'.str_replace('.', '/', $key).'.blade.php');
+        if (!is_file($path)) {
+            return null;
+        }
+
+        $contents = file_get_contents($path);
+
+        return $contents === false ? null : $contents;
+    }
+
+    /**
+     * Load template JS from a Git-backed file.
+     */
+    private function getTemplateFileJs(string $key): ?string
+    {
+        $path = resource_path('builder/scripts/'.str_replace('.', '/', $key).'.js');
+        if (!is_file($path)) {
+            return null;
+        }
+
+        $contents = file_get_contents($path);
+
+        return $contents === false ? null : $contents;
     }
 
     /**
@@ -352,6 +352,10 @@ HTML;
         $html = $this->getTemplateHtmlByVersion($template, $version);
         $css = $version === 'published' ? $template->published_css : $template->draft_css;
         $js = $version === 'published' ? $template->published_js : $template->draft_js;
+        $fileJs = $this->getTemplateFileJs($template->key);
+        if ($fileJs !== null) {
+            $js = $fileJs;
+        }
 
         if (!$css && !$js && $this->hasInlineAssets($html)) {
             $parts = $this->splitTemplateParts($html);
@@ -448,7 +452,16 @@ CSS;
      */
     private function hasPublishedContent(BuilderTemplate $template): bool
     {
-        return (bool) (($template->published_html ?? '') || ($template->published_css ?? '') || ($template->published_js ?? ''));
+        $fileHtml = $this->getTemplateFileHtml($template->key);
+        $fileJs = $this->getTemplateFileJs($template->key);
+
+        return (bool) (
+            $fileHtml ||
+            $fileJs ||
+            ($template->published_html ?? '') ||
+            ($template->published_css ?? '') ||
+            ($template->published_js ?? '')
+        );
     }
 
     /**

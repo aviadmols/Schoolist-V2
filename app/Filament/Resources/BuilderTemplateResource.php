@@ -94,7 +94,7 @@ class BuilderTemplateResource extends Resource
 
                                     $params = array_filter([
                                         'template' => $record,
-                                        'version' => 'draft',
+                                        'version' => 'published',
                                         'preview_classroom_id' => $get('preview_classroom_id'),
                                         'preview_user_id' => $get('preview_user_id'),
                                     ]);
@@ -106,23 +106,9 @@ class BuilderTemplateResource extends Resource
                                 }),
                         ])
                         ->columnSpan(1),
-                    Section::make('HTML')
-                        ->schema([
-                            CodeEditor::make('draft_html')
-                                ->label('')
-                                ->rows(18),
-                        ])
-                        ->columnSpan(1),
                     Section::make('CSS')
                         ->schema([
-                            CodeEditor::make('draft_css')
-                                ->label('')
-                                ->rows(18),
-                        ])
-                        ->columnSpan(1),
-                    Section::make('JS')
-                        ->schema([
-                            CodeEditor::make('draft_js')
+                            CodeEditor::make('published_css')
                                 ->label('')
                                 ->rows(18),
                         ])
@@ -151,19 +137,6 @@ class BuilderTemplateResource extends Resource
 
                     return is_array($decoded) ? $decoded : null;
                 })
-                ->columnSpanFull(),
-            Forms\Components\Repeater::make('versions')
-                ->label('Versions')
-                ->relationship('versions')
-                ->schema([
-                    Forms\Components\TextInput::make('version_type')->label('Type'),
-                    Forms\Components\TextInput::make('created_at')->label('Created At'),
-                ])
-                ->addable(false)
-                ->deletable(false)
-                ->reorderable(false)
-                ->disabled()
-                ->dehydrated(false)
                 ->columnSpanFull(),
         ]);
     }
