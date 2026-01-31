@@ -73,6 +73,15 @@ class TemplateRenderer
                 return $parts;
             });
             $parts = $this->ensureClassroomTabs($template, $parts);
+            // Merge CSS/JS from builder-templates admin (https://app.schoolist.co.il/admin/builder-templates) so the page uses managed styles
+            $managedCss = trim((string) ($template->published_css ?? ''));
+            if ($managedCss !== '') {
+                $parts['css'] = ($parts['css'] ? $parts['css']."\n" : '').$managedCss;
+            }
+            $managedJs = trim((string) ($template->published_js ?? ''));
+            if ($managedJs !== '') {
+                $parts['js'] = ($parts['js'] ? $parts['js']."\n" : '').$managedJs;
+            }
             if (!$this->isTemplateSafe($parts['html'], $parts['css'], $parts['js'])) {
                 return null;
             }
