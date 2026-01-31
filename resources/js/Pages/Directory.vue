@@ -68,7 +68,7 @@
                 </UiField>
                 <div class="flex gap-2">
                   <UiField label="Phone" class="flex-1">
-                    <DigitInput v-model="contact.phone" :length="10" :separator-after="2" />
+                    <UiInput v-model="contact.phone" type="tel" inputmode="numeric" maxlength="10" placeholder="0501234567" />
                   </UiField>
                   <UiField label="Relation" class="w-1/3">
                     <UiInput v-model="contact.relation" placeholder="Mother/Father/etc" />
@@ -97,7 +97,6 @@ import UiButton from '../components/ui/UiButton.vue';
 import UiModal from '../components/ui/UiModal.vue';
 import UiField from '../components/ui/UiField.vue';
 import UiInput from '../components/ui/UiInput.vue';
-import DigitInput from '../components/ui/DigitInput.vue';
 
 defineOptions({ layout: AppLayout });
 

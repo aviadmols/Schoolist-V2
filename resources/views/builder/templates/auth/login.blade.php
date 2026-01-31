@@ -4,6 +4,8 @@
   .sb-digit { width: 2.25rem; height: 2.5rem; text-align: center; font-size: 1.125rem; font-weight: 600; border: 2px solid #e2e8f0; border-radius: 8px; background: #fff; }
   .sb-digit:focus { outline: none; border-color: #2563eb; }
   .sb-digit-sep { padding-bottom: 0.25rem; font-weight: 600; color: #64748b; }
+  .sb-login-input { display: block; width: 100%; max-width: 14rem; padding: 0.5rem 0.75rem; font-size: 1.125rem; border: 2px solid #e2e8f0; border-radius: 8px; background: #fff; }
+  .sb-login-input:focus { outline: none; border-color: #2563eb; }
 </style>
 <div class="sb-login-page">
   <div class="sb-login-card">
@@ -15,22 +17,7 @@
       <div id="sb-step-phone" class="sb-login-step">
         <label class="sb-login-field">
           טלפון
-          <div class="sb-digit-wrap" dir="ltr">
-            <div class="sb-digit-row" id="sb-phone-container">
-              <input type="text" maxlength="1" class="sb-digit" data-phone-idx="0" inputmode="numeric" autocomplete="tel">
-              <input type="text" maxlength="1" class="sb-digit" data-phone-idx="1" inputmode="numeric">
-              <input type="text" maxlength="1" class="sb-digit" data-phone-idx="2" inputmode="numeric">
-              <span class="sb-digit-sep">-</span>
-              <input type="text" maxlength="1" class="sb-digit" data-phone-idx="3" inputmode="numeric">
-              <input type="text" maxlength="1" class="sb-digit" data-phone-idx="4" inputmode="numeric">
-              <input type="text" maxlength="1" class="sb-digit" data-phone-idx="5" inputmode="numeric">
-              <input type="text" maxlength="1" class="sb-digit" data-phone-idx="6" inputmode="numeric">
-              <input type="text" maxlength="1" class="sb-digit" data-phone-idx="7" inputmode="numeric">
-              <input type="text" maxlength="1" class="sb-digit" data-phone-idx="8" inputmode="numeric">
-              <input type="text" maxlength="1" class="sb-digit" data-phone-idx="9" inputmode="numeric">
-            </div>
-            <input type="hidden" name="phone" id="sb-login-phone" value="">
-          </div>
+          <input type="text" name="phone" id="sb-login-phone" class="sb-login-input" inputmode="numeric" autocomplete="tel" maxlength="10" placeholder="0501234567" value="" dir="ltr">
         </label>
         <p id="sb-login-error" class="sb-login-error" style="display: none;"></p>
         <button type="submit" class="sb-login-button" id="sb-login-submit">שלח קוד אימות</button>
@@ -105,14 +92,6 @@
     });
   }
 
-  function syncPhoneHidden() {
-    if (!phoneInput) return;
-    var digits = stepPhone.querySelectorAll('.sb-digit[data-phone-idx]');
-    var arr = [];
-    for (var i = 0; i < digits.length; i++) { arr.push((digits[i].value || '').replace(/\D/g, '').slice(0, 1)); }
-    phoneInput.value = arr.join('');
-  }
-
   function syncCodeHidden() {
     if (!codeInput) return;
     var digits = stepCode.querySelectorAll('.sb-digit[data-code-idx]');
@@ -150,15 +129,18 @@
     }
   }
 
-  var phoneContainer = document.getElementById('sb-phone-container');
   var codeContainer = document.getElementById('sb-code-container');
-  if (phoneContainer) bindDigitInputs(phoneContainer, 'data-phone-idx', syncPhoneHidden);
   if (codeContainer) bindDigitInputs(codeContainer, 'data-code-idx', syncCodeHidden);
+
+  if (phoneInput) {
+    phoneInput.addEventListener('input', function () {
+      this.value = (this.value || '').replace(/\D/g, '').slice(0, 10);
+    });
+  }
 
   if (form) {
     form.addEventListener('submit', function (e) {
       e.preventDefault();
-      syncPhoneHidden();
       syncCodeHidden();
       var step = document.getElementById('sb-login-step').value;
       var phone = (phoneInput && phoneInput.value) ? phoneInput.value.replace(/\D/g, '').slice(0, 10) : '';

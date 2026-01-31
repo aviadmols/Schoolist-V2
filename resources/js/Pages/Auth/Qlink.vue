@@ -9,7 +9,7 @@
       <div v-if="error" class="text-danger text-sm">{{ error }}</div>
 
       <UiField v-if="step === 'phone'" label="טלפון">
-        <DigitInput v-model="phone" :length="10" :separator-after="2" autocomplete="tel" />
+        <UiInput v-model="phone" type="tel" inputmode="numeric" maxlength="10" placeholder="0501234567" autocomplete="tel" />
       </UiField>
 
       <UiField v-if="step === 'code'" label="קוד אימות">

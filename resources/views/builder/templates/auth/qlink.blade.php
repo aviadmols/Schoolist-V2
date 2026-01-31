@@ -4,6 +4,8 @@
   .sb-qlink-digit { width: 2.25rem; height: 2.5rem; text-align: center; font-size: 1.125rem; font-weight: 600; border: 2px solid #e2e8f0; border-radius: 8px; background: #fff; }
   .sb-qlink-digit:focus { outline: none; border-color: #2563eb; }
   .sb-qlink-digit-sep { padding-bottom: 0.25rem; font-weight: 600; color: #64748b; }
+  .sb-qlink-input { display: block; width: 100%; max-width: 14rem; padding: 0.5rem 0.75rem; font-size: 1.125rem; border: 2px solid #e2e8f0; border-radius: 8px; background: #fff; }
+  .sb-qlink-input:focus { outline: none; border-color: #2563eb; }
 </style>
 <div class="sb-qlink-page">
   <div class="sb-qlink-card" data-qlink-token="{{ $page['token'] ?? '' }}">
@@ -13,22 +15,7 @@
       <div class="sb-qlink-error" data-qlink-error style="display: none;"></div>
       <label class="sb-qlink-field">
         Phone
-        <div class="sb-qlink-digit-wrap" dir="ltr">
-          <div class="sb-qlink-digit-row" id="sb-qlink-phone-container">
-            <input type="text" maxlength="1" class="sb-qlink-digit" data-qlink-phone-idx="0" inputmode="numeric" autocomplete="tel">
-            <input type="text" maxlength="1" class="sb-qlink-digit" data-qlink-phone-idx="1" inputmode="numeric">
-            <input type="text" maxlength="1" class="sb-qlink-digit" data-qlink-phone-idx="2" inputmode="numeric">
-            <span class="sb-qlink-digit-sep">-</span>
-            <input type="text" maxlength="1" class="sb-qlink-digit" data-qlink-phone-idx="3" inputmode="numeric">
-            <input type="text" maxlength="1" class="sb-qlink-digit" data-qlink-phone-idx="4" inputmode="numeric">
-            <input type="text" maxlength="1" class="sb-qlink-digit" data-qlink-phone-idx="5" inputmode="numeric">
-            <input type="text" maxlength="1" class="sb-qlink-digit" data-qlink-phone-idx="6" inputmode="numeric">
-            <input type="text" maxlength="1" class="sb-qlink-digit" data-qlink-phone-idx="7" inputmode="numeric">
-            <input type="text" maxlength="1" class="sb-qlink-digit" data-qlink-phone-idx="8" inputmode="numeric">
-            <input type="text" maxlength="1" class="sb-qlink-digit" data-qlink-phone-idx="9" inputmode="numeric">
-          </div>
-          <input type="hidden" name="phone" value="">
-        </div>
+        <input type="text" name="phone" class="sb-qlink-input" inputmode="numeric" autocomplete="tel" maxlength="10" placeholder="0501234567" value="" dir="ltr">
       </label>
       <label class="sb-qlink-field" data-qlink-code-field style="display: none;">
         Code
@@ -51,18 +38,16 @@
 (function () {
   var root = document.querySelector('[data-qlink-form]');
   if (!root) return;
-  var phoneContainer = document.getElementById('sb-qlink-phone-container');
+  var phoneInput = root.querySelector('input[name="phone"]');
   var codeContainer = document.getElementById('sb-qlink-code-container');
-  var phoneHidden = root.querySelector('input[name="phone"]');
   var codeHidden = root.querySelector('input[name="code"]');
 
-  function syncPhone() {
-    if (!phoneHidden) return;
-    var inputs = phoneContainer.querySelectorAll('.sb-qlink-digit[data-qlink-phone-idx]');
-    var arr = [];
-    for (var i = 0; i < inputs.length; i++) arr.push((inputs[i].value || '').replace(/\D/g, '').slice(0, 1));
-    phoneHidden.value = arr.join('');
+  if (phoneInput) {
+    phoneInput.addEventListener('input', function () {
+      this.value = (this.value || '').replace(/\D/g, '').slice(0, 10);
+    });
   }
+
   function syncCode() {
     if (!codeHidden) return;
     var inputs = codeContainer.querySelectorAll('.sb-qlink-digit[data-qlink-code-idx]');
@@ -95,7 +80,6 @@
       })(i, inputs[i]);
     }
   }
-  if (phoneContainer) bindDigits(phoneContainer, 'data-qlink-phone-idx', syncPhone);
   if (codeContainer) bindDigits(codeContainer, 'data-qlink-code-idx', syncCode);
 })();
 </script>
