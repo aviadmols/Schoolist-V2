@@ -258,7 +258,6 @@ class TemplateManager
 
     /**
      * Get default screen HTML from the bundled design (file), not from DB.
-     * Use this when rendering so the classroom page always uses the code/default design.
      */
     public function getDefaultScreenHtml(string $key): string
     {
