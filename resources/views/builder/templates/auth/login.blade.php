@@ -10,7 +10,7 @@
 <div class="sb-login-page">
   <div class="sb-login-card">
     <h1 class="sb-login-title">בואו נתחבר</h1>
-    <p class="sb-login-subtitle">התחברות למערכת — אחר כך תוכלו לצרף כיתה מהפרופיל. הקישור לא ייקשר לכיתה.</p>
+    <p class="sb-login-subtitle">אחר כך תוכלו לצרף כיתה מהפרופיל. הקישור לא ייקשר לכיתה.</p>
     <form id="sb-login-form" class="sb-login-stack" method="post" action="">
       @csrf
       <input type="hidden" name="_step" id="sb-login-step" value="phone">

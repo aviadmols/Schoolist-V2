@@ -35,6 +35,7 @@ class ClassroomShowController extends Controller
             'weatherSetting',
             'links',
             'importantContacts',
+            'timetableFile',
         ]);
 
         $user = auth()->user();
@@ -122,7 +123,7 @@ class ClassroomShowController extends Controller
         $weekStart = $today->copy()->startOfWeek();
         $weekEnd = $today->copy()->endOfWeek();
 
-        $pageData = Cache::remember("classroom.page.data.{$classroom->id}", 300, function () use (
+        $pageData = Cache::remember("classroom.page.data.{$classroom->id}.{$today->format('Y-m-d')}", 300, function () use (
             $classroom,
             $today,
             $timetableService,

@@ -5,13 +5,17 @@ namespace App\Http\Controllers\Classroom;
 use App\Http\Controllers\Controller;
 use App\Services\Announcements\AnnouncementFeedService;
 use App\Services\Classroom\TimetableService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Inertia\Response;
-use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
+    /** @var int Dashboard payload cache TTL (seconds). */
+    private const DASHBOARD_CACHE_TTL = 120;
+
     /** @var TimetableService */
     private TimetableService $timetableService;
 
@@ -30,7 +34,17 @@ class DashboardController extends Controller
     public function __invoke(Request $request): Response
     {
         $classroom = $request->attributes->get('current_classroom');
-        $dayOfWeek = $request->query('day', Carbon::now($classroom->timezone)->dayOfWeek);
+        $today = Carbon::now($classroom->timezone);
+        $dayOfWeek = $request->query('day', $today->dayOfWeek);
+
+        $cacheKey = sprintf('dashboard.classroom.%s.%s', $classroom->id, $today->format('Y-m-d'));
+        $cached = Cache::remember($cacheKey, self::DASHBOARD_CACHE_TTL, function () use ($classroom) {
+            return [
+                'timetable' => $this->timetableService->getWeeklyTimetable($classroom),
+                'announcements' => $this->announcementService->getActiveFeed($classroom)->values()->all(),
+                'timetable_image' => $this->timetableService->getTimetableImageUrl($classroom),
+            ];
+        });
 
         return Inertia::render('Dashboard', [
             'classroom' => [
@@ -42,9 +56,9 @@ class DashboardController extends Controller
                 'school_name' => $classroom->school?->name,
             ],
             'selected_day' => (int) $dayOfWeek,
-            'timetable' => $this->timetableService->getWeeklyTimetable($classroom), // Get whole week
-            'announcements' => $this->announcementService->getActiveFeed($classroom),
-            'timetable_image' => $this->timetableService->getTimetableImageUrl($classroom),
+            'timetable' => $cached['timetable'],
+            'announcements' => $cached['announcements'],
+            'timetable_image' => $cached['timetable_image'],
         ]);
     }
 }

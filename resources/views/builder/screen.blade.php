@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
     {{-- Builder screens (classroom etc.) are server-rendered + inline template JS; no Vue/Inertia bundle needed - improves LCP and avoids app.js errors --}}
+    <link rel="stylesheet" href="{{ asset('polin.css') }}">
     @if ($themeCssUrl = builder_theme_css_url())
       <link rel="stylesheet" href="{{ $themeCssUrl }}">
     @endif
