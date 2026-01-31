@@ -66,6 +66,7 @@ class TemplateRenderer
             $contentHash = hash('sha256', $defaultHtml);
             $resolvedCacheKey = self::CACHE_KEY_PREFIX.'classroom.page.resolved.'.$contentHash;
             $parts = Cache::remember($resolvedCacheKey, self::CACHE_TTL_SECONDS, function () use ($defaultHtml) {
+                $this->preloadPopupTemplates();
                 $parts = $this->splitTemplateParts($defaultHtml);
                 $parts['html'] = $this->resolveIncludeTokens($parts['html'], 0);
 
@@ -133,6 +134,26 @@ class TemplateRenderer
             ->first();
 
         return self::$templateCache[$key] = $template;
+    }
+
+    /**
+     * Preload all popup templates in one query to avoid N+1 when resolving [[popup:...]] tokens.
+     */
+    private function preloadPopupTemplates(): void
+    {
+        $prefix = (string) config('builder.popup_prefix');
+        if ($prefix === '') {
+            return;
+        }
+
+        $templates = BuilderTemplate::query()
+            ->where('scope', config('builder.scope'))
+            ->where('key', 'like', $prefix.'%')
+            ->get();
+
+        foreach ($templates as $template) {
+            self::$templateCache[$template->key] = $template;
+        }
     }
 
     /**

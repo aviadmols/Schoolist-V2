@@ -317,12 +317,24 @@ class ClassroomShowController extends Controller
         $pageData['selected_date'] = $weekStart->copy()->addDays($selectedDay)->format('Y-m-d');
         $pageData['week_dates'] = array_map(fn ($d) => $weekStart->copy()->addDays($d)->format('Y-m-d'), range(0, 6));
 
-        $overrideParts = app(TemplateRenderer::class)->renderPublishedPartsByKey('classroom.page', [
-            'user' => auth()->user(),
-            'classroom' => $classroom,
-            'locale' => app()->getLocale(),
-            'page' => $pageData,
-        ]);
+        // Cache full rendered HTML per user to improve LCP: avoid Blade::render + resolveIncludeTokens on repeat visits
+        $userId = $user?->id ?? 0;
+        $renderedCacheKey = sprintf(
+            'classroom.page.rendered.%s.%s.%s.%s.%s',
+            $classroom->id,
+            $selectedDay,
+            $today->format('Y-m-d'),
+            $canManage ? '1' : '0',
+            $userId
+        );
+        $overrideParts = Cache::remember($renderedCacheKey, 300, function () use ($classroom, $pageData) {
+            return app(TemplateRenderer::class)->renderPublishedPartsByKey('classroom.page', [
+                'user' => auth()->user(),
+                'classroom' => $classroom,
+                'locale' => app()->getLocale(),
+                'page' => $pageData,
+            ]);
+        });
 
         if ($overrideParts) {
             return response()->view('builder.screen', [
