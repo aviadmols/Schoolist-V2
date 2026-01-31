@@ -1,20 +1,18 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
     /**
      * Run the migrations.
      * Allow qlink tokens 4-32 chars so any /qlink/{number} works.
+     * Only change column length; do not re-add unique (already exists).
      */
     public function up(): void
     {
-        Schema::table('qlinks', function (Blueprint $table) {
-            $table->string('token', 32)->unique()->change();
-        });
+        DB::statement('ALTER TABLE qlinks MODIFY token VARCHAR(32) NOT NULL');
     }
 
     /**
@@ -22,8 +20,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('qlinks', function (Blueprint $table) {
-            $table->string('token', 12)->unique()->change();
-        });
+        DB::statement('ALTER TABLE qlinks MODIFY token VARCHAR(12) NOT NULL');
     }
 };
