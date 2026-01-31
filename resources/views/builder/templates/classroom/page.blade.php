@@ -280,7 +280,7 @@
   </button>
 </div>
 
-<div class="sb-popup-backdrop" data-popup-backdrop></div>
+<div class="sb-popup-backdrop 3" data-popup-backdrop></div>
 
 <div id="popup-quick-add" class="sb-popup" data-popup>
   <div class="sb-popup-card quick-add-card">

@@ -10,6 +10,7 @@
 <div class="sb-login-page">
   <div class="sb-login-card">
     <h1 class="sb-login-title">בואו נתחבר</h1>
+    <p class="sb-login-subtitle">התחברות למערכת — אחר כך תוכלו לצרף כיתה מהפרופיל. הקישור לא ייקשר לכיתה.</p>
     <form id="sb-login-form" class="sb-login-stack" method="post" action="">
       @csrf
       <input type="hidden" name="_step" id="sb-login-step" value="phone">
@@ -45,7 +46,7 @@
     <div class="sb-login-divider"></div>
     <div class="sb-login-links">
       <span>עדיין לא הצטרפתם?</span>
-      <a href="{{ route('auth.register') }}">מוזמנים כאן</a>
+      <a href="{{ route('auth.code') }}">מוזמנים כאן</a>
     </div>
   </div>
 </div>
@@ -208,7 +209,7 @@
               return;
             }
             if (res.ok && res.data && res.data.requires_registration) {
-              window.location.href = '{{ route("auth.register") }}?phone=' + encodeURIComponent(phone);
+              window.location.href = '{{ route("auth.code") }}?phone=' + encodeURIComponent(phone);
               return;
             }
             showError(errorCodeEl, (res.data && res.data.errors && res.data.errors.code) ? (Array.isArray(res.data.errors.code) ? res.data.errors.code[0] : res.data.errors.code) : (res.data && res.data.message) || 'הקוד שגוי או שפג תוקפו.');

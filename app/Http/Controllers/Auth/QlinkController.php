@@ -27,19 +27,29 @@ use Inertia\Response;
 
 class QlinkController extends Controller
 {
-    /** @var int */
-    private const TOKEN_LENGTH = 12;
+    /** @var int Min length for qlink token (any /qlink/{number} works). */
+    private const TOKEN_MIN_LENGTH = 4;
+
+    /** @var int Max length for qlink token. */
+    private const TOKEN_MAX_LENGTH = 32;
 
     /** @var int */
     private const TOKEN_EXPIRES_DAYS = 180;
 
     /**
-     * Show the qlink login page.
+     * Show the qlink login page. If user is logged in and qlink is linked to a class they belong to, redirect to class.
      */
     public function show(string $token, TemplateRenderer $renderer): Response
     {
         $isValid = $this->isValidToken($token);
         $qlink = $this->getOrCreateQlink($token);
+
+        if ($qlink && $qlink->classroom_id && auth()->check()) {
+            $classroom = $qlink->classroom;
+            if ($classroom && auth()->user()->classrooms()->where('classroom_id', $classroom->id)->exists()) {
+                return redirect()->route('classroom.show', $classroom);
+            }
+        }
 
         if ($qlink) {
             QlinkVisit::create([
@@ -302,11 +312,15 @@ class QlinkController extends Controller
     }
 
     /**
-     * Get an active qlink by token.
+     * Check if token is valid (4-32 digits so any /qlink/{number} works).
      */
     private function isValidToken(string $token): bool
     {
-        return (bool) preg_match('/^[0-9]{' . self::TOKEN_LENGTH . '}$/', $token);
+        $len = strlen($token);
+
+        return $len >= self::TOKEN_MIN_LENGTH
+            && $len <= self::TOKEN_MAX_LENGTH
+            && (bool) preg_match('/^[0-9]+$/', $token);
     }
 
     /**
