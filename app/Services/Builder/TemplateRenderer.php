@@ -56,32 +56,28 @@ class TemplateRenderer
             return null;
         }
 
-        // classroom.page: always use default design from TemplateManager (bundled file), never DB.
-        // Cache resolved parts (tokens replaced) to avoid loading 11 popup templates from DB on every request.
+        // classroom.page: load only from the 3 files (Blade, CSS, JS) — never from DB.
         if ($key === 'classroom.page') {
-            $defaultHtml = app(TemplateManager::class)->getDefaultScreenHtml('classroom.page');
-            if ($defaultHtml === '') {
+            $fileHtml = $this->getTemplateFileHtml('classroom.page');
+            if ($fileHtml === null || $fileHtml === '') {
                 return null;
             }
-            $contentHash = hash('sha256', $defaultHtml);
-            $resolvedCacheKey = self::CACHE_KEY_PREFIX.'classroom.page.resolved.'.$contentHash;
-            $parts = Cache::remember($resolvedCacheKey, self::CACHE_TTL_SECONDS, function () use ($defaultHtml) {
+            $fileCss = $this->getTemplateFileCss('classroom.page');
+            $fileJs = $this->getTemplateFileJs('classroom.page');
+            $contentHash = hash('sha256', $fileHtml.($fileCss ?? '').($fileJs ?? ''));
+            $resolvedCacheKey = self::CACHE_KEY_PREFIX.'classroom.page.files.'.$contentHash;
+            $parts = Cache::remember($resolvedCacheKey, self::CACHE_TTL_SECONDS, function () use ($fileHtml, $fileCss, $fileJs) {
                 $this->preloadPopupTemplates();
-                $parts = $this->splitTemplateParts($defaultHtml);
+                $parts = [
+                    'html' => $fileHtml,
+                    'css' => $fileCss,
+                    'js' => $fileJs,
+                ];
                 $parts['html'] = $this->resolveIncludeTokens($parts['html'], 0);
 
                 return $parts;
             });
             $parts = $this->ensureClassroomTabs($template, $parts);
-            // Merge CSS/JS from builder-templates admin (https://app.schoolist.co.il/admin/builder-templates) so the page uses managed styles
-            $managedCss = trim((string) ($template->published_css ?? ''));
-            if ($managedCss !== '') {
-                $parts['css'] = ($parts['css'] ? $parts['css']."\n" : '').$managedCss;
-            }
-            $managedJs = trim((string) ($template->published_js ?? ''));
-            if ($managedJs !== '') {
-                $parts['js'] = ($parts['js'] ? $parts['js']."\n" : '').$managedJs;
-            }
             if (!$this->isTemplateSafe($parts['html'], $parts['css'], $parts['js'])) {
                 return null;
             }
@@ -285,6 +281,21 @@ class TemplateRenderer
     private function getTemplateFileHtml(string $key): ?string
     {
         $path = resource_path('views/builder/templates/'.str_replace('.', '/', $key).'.blade.php');
+        if (!is_file($path)) {
+            return null;
+        }
+
+        $contents = file_get_contents($path);
+
+        return $contents === false ? null : $contents;
+    }
+
+    /**
+     * Load template CSS from a Git-backed file.
+     */
+    private function getTemplateFileCss(string $key): ?string
+    {
+        $path = resource_path('builder/styles/'.str_replace('.', '/', $key).'.css');
         if (!is_file($path)) {
             return null;
         }
